@@ -42,6 +42,9 @@ proxy (Traefik + Authelia) and to talk to Docker through a socket proxy:
 
 - it trusts the user header (`Remote-User`) only from `DOCKERR_TRUSTED_PROXIES`,
   which is required; optional group check with `DOCKERR_REQUIRE_GROUP`;
+- the proxy must strip that header from client requests and Authelia must never
+  apply a `bypass` policy to dockerr's domain, or a client could name itself
+  (the example compose does the stripping);
 - state-changing requests must come from the same origin;
 - at start it probes which API sections the socket proxy allows and greys out the
   features it cannot perform, naming the missing proxy setting;

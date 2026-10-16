@@ -31,7 +31,7 @@ services:
     restart: unless-stopped
 
   dockerr:
-    image: dockerr:dev
+    image: ghcr.io/neotoxicfr/dockerr:dev
     container_name: dockerr
     depends_on:
       - dockerr-socket
@@ -59,7 +59,14 @@ services:
     labels:
       traefik.enable: "true"
       traefik.http.routers.dockerr.rule: Host(`dockerr.example.com`)
-      traefik.http.routers.dockerr.middlewares: authelia@file
+      # Drop identity headers sent by the client before Authelia runs: when
+      # Authelia answers without them (a bypass rule), Traefik would pass the
+      # client's own Remote-User through. Never put dockerr under a bypass rule.
+      traefik.http.middlewares.dockerr-noid.headers.customrequestheaders.Remote-User: ""
+      traefik.http.middlewares.dockerr-noid.headers.customrequestheaders.Remote-Groups: ""
+      traefik.http.middlewares.dockerr-noid.headers.customrequestheaders.Remote-Name: ""
+      traefik.http.middlewares.dockerr-noid.headers.customrequestheaders.Remote-Email: ""
+      traefik.http.routers.dockerr.middlewares: dockerr-noid, authelia@file
       traefik.http.services.dockerr.loadbalancer.server.port: "8080"
     security_opt:
       - no-new-privileges:true
