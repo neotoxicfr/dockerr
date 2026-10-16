@@ -6,7 +6,7 @@ require (
 	github.com/coder/websocket v1.8.15
 	github.com/compose-spec/compose-go/v2 v2.16.1
 	github.com/distribution/reference v0.6.0
-	github.com/docker/cli v29.8.2+incompatible
+	github.com/docker/cli v29.9.0+incompatible
 	github.com/docker/compose/v5 v5.6.0
 	github.com/moby/moby/api v1.56.1
 	github.com/moby/moby/client v0.6.2
