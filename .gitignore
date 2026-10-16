@@ -1,8 +1,22 @@
+# Build output
 /bin/
-/data/
-/.audit/
-/tools/vendor/node_modules/
+/dockerr
 *.test
 *.out
-.DS_Store
+
+# Local data and scratch
+/data/
+/.audit/
+
+# Vendor bundle sources (rebuilt by tools/vendor/build.sh)
+/tools/vendor/node_modules/
+
+# Local assistant notes
 CLAUDE.md
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

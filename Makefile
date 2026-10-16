@@ -1,4 +1,4 @@
-.PHONY: dev build test test-race vet vendor docker
+.PHONY: dev build test test-race vet lint vuln check vendor docker
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/neotoxicfr/dockerr/internal/server.Version=$(VERSION)
@@ -18,6 +18,15 @@ test-race:
 
 vet:
 	go vet ./...
+
+lint:
+	golangci-lint run
+
+vuln:
+	govulncheck ./...
+
+# What CI runs, before pushing.
+check: build test-race lint vuln
 
 # Rebuild the CodeMirror and xterm bundles in web/static/vendor.
 vendor:
