@@ -1,0 +1,51 @@
+{{define "content"}}{{$d := .Data}}{{$st := $d.Stack}}
+<div id="stack-live" data-live="/s/{{$st.Name}}/services?tab={{$d.Tab}}" data-stack="{{$st.Name}}">{{template "stack-live" .}}</div>
+{{if eq $d.Tab "compose"}}{{template "compose-tab" .}}{{end}}
+{{if eq $d.Tab "history"}}{{template "history-tab" .}}{{end}}
+{{end}}
+
+{{define "compose-tab"}}{{$st := .Data.Stack}}
+<div id="compose-editor" data-stack="{{$st.Name}}" data-editable="{{if $st.Managed}}1{{end}}" data-compose-ok="{{if .Caps.Compose}}1{{end}}">
+  <div class="editor-bar">
+    <div class="seg" role="tablist">
+      <button role="tab" aria-selected="true" data-file="compose">{{if $st.File}}{{base $st.File}}{{else}}compose.yaml{{end}}</button>
+      <button role="tab" data-file="env">.env</button>
+    </div>
+    <div class="status" id="ed-status" aria-live="polite"></div>
+    {{if $st.Managed}}
+    <div class="actions">
+      <button class="btn" id="ed-reset" disabled>Annuler</button>
+      <button class="btn" id="ed-save" disabled>Enregistrer</button>
+      <button class="btn primary" id="ed-apply" disabled>Enregistrer et appliquer</button>
+    </div>
+    {{else}}<span class="pill">Lecture seule</span>{{end}}
+  </div>
+  <div class="editor" id="editor"></div>
+</div>
+<dialog id="diff-dialog" class="wide">
+  <form method="dialog">
+    <div class="dlg-body"><h2>Modifications</h2><div id="diff-body"></div></div>
+    <div class="dlg-foot"><button class="btn" value="no">Annuler</button><button class="btn primary" value="yes" id="diff-ok">Enregistrer</button></div>
+  </form>
+</dialog>
+<script type="module" src="/static/js/editor.js?v={{.Version}}"></script>
+{{end}}
+
+{{define "history-tab"}}{{$d := .Data}}
+{{if $d.Versions}}
+<div class="history" data-stack="{{$d.Stack.Name}}">
+  <div class="card versions" role="listbox" aria-label="Versions">
+    {{range $d.Versions}}
+    <button role="option" data-version="{{.ID}}">
+      <span>{{datetime .Created}}</span><span class="badge plain">{{if eq .File "env"}}.env{{else}}compose{{end}}</span>
+      <span class="who">{{.Author}}{{if .Note}} · {{.Note}}{{end}}</span>
+    </button>
+    {{end}}
+  </div>
+  <div class="card version-view" id="version-view"><p class="faint">Choisis une version.</p></div>
+</div>
+<script type="module" src="/static/js/history.js?v={{.Version}}"></script>
+{{else}}
+<div class="card empty"><p>Pas encore d'historique : chaque enregistrement depuis dockerr crée une version.</p></div>
+{{end}}
+{{end}}

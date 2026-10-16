@@ -1,0 +1,18 @@
+{{define "content"}}{{$d := .Data}}
+<header class="bar">
+  <h1>Piles</h1>
+  <div class="bar-actions">
+    <label class="search"><svg class="i s"><use href="#i-search"/></svg><span class="sr">Rechercher</span><input type="search" id="q" placeholder="Rechercher" autocomplete="off"></label>
+    <button class="btn icon ghost" data-check-updates title="Vérifier les mises à jour{{if not $d.LastCheck.IsZero}} · dernière vérification {{since $d.LastCheck}}{{end}}" aria-label="Vérifier les mises à jour"><svg class="i"><use href="#i-restart"/></svg></button>
+    <a class="btn primary" href="/new"><svg class="i s"><use href="#i-plus"/></svg><span>Nouvelle pile</span></a>
+  </div>
+</header>
+<div class="filters"><div class="seg" role="tablist" id="filters">
+  <button role="tab" aria-selected="true" data-filter="all">Toutes <span class="n">{{len $d.Stacks}}</span></button>
+  {{if or $d.Problem $d.Partial}}<button role="tab" data-filter="attention">À voir <span class="n">{{add $d.Problem $d.Partial}}</span></button>{{end}}
+  <button role="tab" data-filter="running">En marche <span class="n">{{$d.Running}}</span></button>
+  {{if $d.Stopped}}<button role="tab" data-filter="stopped">Arrêtées <span class="n">{{$d.Stopped}}</span></button>{{end}}
+  {{if $d.Updates}}<button role="tab" data-filter="updates">Mises à jour <span class="n">{{$d.Updates}}</span></button>{{end}}
+</div></div>
+<div class="list" id="stack-list" data-live="/stacks/rows">{{template "stack-rows" .}}</div>
+{{end}}

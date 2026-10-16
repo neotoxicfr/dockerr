@@ -1,0 +1,47 @@
+{{define "content"}}{{$c := .Data}}
+<header class="bar">
+  <a class="back" href="{{if $c.Project}}/s/{{$c.Project}}{{else}}/resources{{end}}" aria-label="Retour"><svg class="i"><use href="#i-back"/></svg></a>
+  <h1><span class="name">{{$c.Name}}</span> <span class="pill"><span class="dot {{ctrClass $c.Container}}"></span>{{ctrLabel $c.Container}}</span></h1>
+  <div class="bar-actions">
+    {{if $c.DozzleURL}}<a class="btn" href="{{$c.DozzleURL}}/container/{{short $c.ID}}" target="_blank" rel="noopener"><svg class="i s"><use href="#i-logs"/></svg>Logs</a>{{end}}
+    {{if and $c.Running $c.ExecEnabled}}<a class="btn" href="/c/{{short $c.ID}}/terminal"><svg class="i s"><use href="#i-terminal"/></svg>Terminal</a>{{end}}
+    {{if $c.Running}}
+    <button class="btn" data-ctr-action="restart" data-id="{{short $c.ID}}"><svg class="i s"><use href="#i-restart"/></svg>Redémarrer</button>
+    <button class="btn" data-ctr-action="stop" data-id="{{short $c.ID}}" data-confirm="Arrêter {{$c.Name}} ?"><svg class="i s"><use href="#i-stop"/></svg>Arrêter</button>
+    {{else}}
+    <button class="btn primary" data-ctr-action="start" data-id="{{short $c.ID}}"><svg class="i s"><use href="#i-play"/></svg>Démarrer</button>
+    {{end}}
+    <button class="btn icon danger" data-ctr-action="remove" data-id="{{short $c.ID}}" data-confirm="Supprimer le conteneur {{$c.Name}} ?{{if $c.Project}} compose le recréera au prochain démarrage de la pile.{{end}}" aria-label="Supprimer"><svg class="i s"><use href="#i-trash"/></svg></button>
+  </div>
+</header>
+
+<section class="panel"><div class="card kv">
+  <div class="k">Image</div><div class="mono">{{$c.Image}}</div>
+  {{if $c.Project}}<div class="k">Pile</div><div><a href="/s/{{$c.Project}}">{{$c.Project}}</a> · {{$c.Service}}</div>{{end}}
+  <div class="k">Commande</div><div class="mono">{{$c.Cmd}}</div>
+  <div class="k">Redémarrage</div><div>{{if $c.Restart}}{{$c.Restart}}{{else}}no{{end}}{{if $c.RestartCount}} <span class="faint">· {{$c.RestartCount}} fois</span>{{end}}</div>
+  <div class="k">Créé</div><div>{{$c.Created}}</div>
+  {{if $c.Started}}<div class="k">Démarré</div><div>{{$c.Started}}</div>{{end}}
+</div></section>
+
+<section class="panel"><h2>Réseau</h2><div class="card kv">
+  <div class="k">Mode</div><div class="mono">{{netMode $c.NetworkMode}}{{if $c.NetParent}} <span class="{{if $c.NetLost}}badge bad{{else}}faint{{end}}">{{if $c.NetLost}}réseau perdu{{else}}via {{$c.NetParent}}{{end}}</span>{{end}}</div>
+  {{range $c.IPs}}<div class="k">{{.K}}</div><div class="mono">{{.V}}</div>{{end}}
+  {{if $c.Ports}}<div class="k">Ports</div><div class="mono">{{range $i, $p := $c.Ports}}{{if $i}}, {{end}}{{$p.Public}}→{{$p.Private}}/{{$p.Proto}}{{end}}</div>{{end}}
+  {{if $c.Children}}<div class="k">Partage son réseau avec</div><div>{{range $i, $x := $c.Children}}{{if $i}}, {{end}}<a href="/c/{{short $x.ID}}">{{$x.Name}}</a>{{end}}</div>{{end}}
+</div></section>
+
+{{if $c.Mounts}}<section class="panel"><h2>Montages</h2><div class="card kv">
+  {{range $c.Mounts}}<div class="k mono">{{.K}}</div><div class="muted">{{.V}}</div>{{end}}
+</div></section>{{end}}
+
+{{if $c.Env}}<section class="panel"><h2>Variables</h2><div class="card kv">
+  {{range $c.Env}}<div class="k mono">{{.K}}</div><div class="mono"><span class="secret" title="Afficher" tabindex="0">{{.V}}</span></div>{{end}}
+</div></section>{{end}}
+
+<section class="panel"><details class="card"><summary>Labels</summary><div class="kv">
+  {{range $c.LabelList}}<div class="k mono">{{.K}}</div><div class="mono">{{.V}}</div>{{end}}
+</div></details></section>
+
+<section class="panel"><details class="card"><summary>Inspect</summary><pre class="raw">{{$c.Raw}}</pre></details></section>
+{{end}}

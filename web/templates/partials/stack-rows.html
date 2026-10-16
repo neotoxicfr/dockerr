@@ -1,0 +1,27 @@
+{{define "stack-rows"}}{{$d := .Data}}{{$caps := .Caps}}
+{{if $d.Err}}<div class="error-box">{{$d.Err}}</div>{{end}}
+{{range $d.Stacks}}
+<div class="row" data-name="{{.Name}}" data-state="{{.State}}" {{if .Updates}}data-upd="1"{{end}}>
+  <span class="dot {{.State}}" title="{{stateLabel .State}}"></span>
+  <span class="name"><a href="/s/{{.Name}}">{{.Name}}</a></span>
+  <span class="num" title="Services en marche">{{.Up}}/{{.Total}}</span>
+  <span class="num cpu" title="Processeur">{{if .Up}}{{cpu .CPU}}{{end}}</span>
+  <span class="num mem" title="Mémoire">{{if .Mem}}{{bytes .Mem}}{{end}}</span>
+  <span class="tags">{{if .LoadErr}}<span class="badge bad" title="{{.LoadErr}}">compose invalide</span>{{else if .Updates}}<span class="badge upd" title="{{.Updates}} {{plural .Updates "service" "services"}} à mettre à jour"><svg class="i s"><use href="#i-update"/></svg>{{.Updates}}</span>{{end}}</span>
+  <span class="act">{{if not .Self}}
+    {{if .Updates}}<button class="btn icon ghost upd opt" data-op="update" data-stack="{{.Name}}" title="Mettre à jour" aria-label="Mettre à jour {{.Name}}" {{if not $caps.Compose}}aria-disabled="true"{{end}}><svg class="i"><use href="#i-update"/></svg></button>{{end}}
+    {{if eq .Up 0}}
+    <button class="btn icon ghost" data-op="start" data-stack="{{.Name}}" title="Démarrer" aria-label="Démarrer {{.Name}}" {{if not .File}}aria-disabled="true"{{end}}><svg class="i"><use href="#i-play"/></svg></button>
+    {{else}}
+    <button class="btn icon ghost opt" data-op="restart" data-stack="{{.Name}}" title="Redémarrer" aria-label="Redémarrer {{.Name}}"><svg class="i"><use href="#i-restart"/></svg></button>
+    <button class="btn icon ghost" data-op="stop" data-stack="{{.Name}}" title="Arrêter" aria-label="Arrêter {{.Name}}"><svg class="i"><use href="#i-stop"/></svg></button>
+    {{end}}{{end}}
+  </span>
+</div>
+{{else}}
+<div class="empty">
+  <p>Aucune pile pour l'instant.</p>
+  <a class="btn primary" href="/new"><svg class="i s"><use href="#i-plus"/></svg>Nouvelle pile</a>
+</div>
+{{end}}
+{{end}}

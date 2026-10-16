@@ -1,0 +1,8 @@
+/bin/
+/data/
+/.audit/
+/tools/vendor/node_modules/
+*.test
+*.out
+.DS_Store
+CLAUDE.md

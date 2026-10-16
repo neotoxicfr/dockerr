@@ -1,0 +1,75 @@
+{{define "content"}}{{$d := .Data}}{{$caps := .Caps}}
+<header class="bar"><h1>Ressources</h1>
+  <div class="bar-actions"><label class="search"><svg class="i s"><use href="#i-search"/></svg><span class="sr">Filtrer</span><input type="search" id="q" placeholder="Filtrer" autocomplete="off"></label></div>
+</header>
+<nav class="tabs">
+  <a href="/resources" {{if eq $d.Tab "containers"}}aria-current="page"{{end}}>Conteneurs</a>
+  <a href="/resources?tab=images" {{if eq $d.Tab "images"}}aria-current="page"{{end}}>Images</a>
+  <a href="/resources?tab=networks" {{if eq $d.Tab "networks"}}aria-current="page"{{end}}>Réseaux</a>
+  <a href="/resources?tab=volumes" {{if eq $d.Tab "volumes"}}aria-current="page"{{end}}>Volumes</a>
+</nav>
+{{if $d.Err}}<div class="error-box">{{$d.Err}}</div>{{end}}
+
+{{if eq $d.Tab "containers"}}
+<div class="section-bar"><span class="grow"></span><button class="btn" data-prune="containers" data-confirm="Supprimer les conteneurs arrêtés ?">Supprimer les arrêtés</button></div>
+<div class="table-wrap"><table data-filterable>
+  <thead><tr><th>Nom</th><th>État</th><th>Image</th><th>Pile</th><th class="num">CPU</th><th class="num">Mémoire</th></tr></thead>
+  <tbody>{{range $d.Containers}}
+  <tr data-text="{{.Name}} {{.Image}} {{.Project}}">
+    <td><a class="cell-name" href="/c/{{short .ID}}"><span class="dot {{ctrClass .}}"></span>{{.Name}}</a></td>
+    <td class="muted">{{ctrLabel .}}</td>
+    <td class="mono muted" title="{{.Image}}">{{imageTag .Image}}</td>
+    <td>{{if .Project}}<a href="/s/{{.Project}}">{{.Project}}</a>{{else}}<span class="faint">—</span>{{end}}</td>
+    <td class="num muted">{{if .Running}}{{cpu .CPU}}{{end}}</td>
+    <td class="num muted">{{if .Mem}}{{bytes .Mem}}{{end}}</td>
+  </tr>{{end}}</tbody>
+</table></div>
+{{end}}
+
+{{if eq $d.Tab "images"}}
+{{if not $caps.Images}}<div class="error-box">Le proxy Docker refuse l'accès aux images (IMAGES=1).</div>{{else}}
+<div class="section-bar"><span class="grow"></span><button class="btn" data-prune="images" data-confirm="Supprimer toutes les images qu'aucun conteneur n'utilise ?">Supprimer les inutilisées</button></div>
+<div class="table-wrap"><table data-filterable>
+  <thead><tr><th>Image</th><th>ID</th><th class="num">Taille</th><th class="num">Créée</th><th>Utilisée</th><th></th></tr></thead>
+  <tbody>{{range $d.Images}}
+  <tr data-text="{{join .Tags " "}} {{.ID}}">
+    <td class="mono">{{if .Tags}}{{join .Tags ", "}}{{else}}<span class="faint">sans tag</span>{{end}}</td>
+    <td class="mono muted">{{short .ID}}</td>
+    <td class="num">{{bytes (u64 .Size)}}</td>
+    <td class="num muted">{{since .Created}}</td>
+    <td>{{if .Used}}{{.Used}} {{plural .Used "conteneur" "conteneurs"}}{{else}}<span class="faint">non</span>{{end}}</td>
+    <td class="num">{{if not .Used}}<button class="btn icon ghost" data-image-remove="{{.ID}}" aria-label="Supprimer"><svg class="i s"><use href="#i-trash"/></svg></button>{{end}}</td>
+  </tr>{{end}}</tbody>
+</table></div>
+{{end}}{{end}}
+
+{{if eq $d.Tab "networks"}}
+{{if not $caps.Networks}}<div class="error-box">Le proxy Docker refuse l'accès aux réseaux (NETWORKS=1).</div>{{else}}
+<div class="section-bar"><span class="grow"></span><button class="btn" data-prune="networks" data-confirm="Supprimer les réseaux qu'aucun conteneur n'utilise ?">Supprimer les inutilisés</button></div>
+<div class="table-wrap"><table data-filterable>
+  <thead><tr><th>Réseau</th><th>Pilote</th><th>Pile</th><th>Conteneurs</th></tr></thead>
+  <tbody>{{range $d.Networks}}
+  <tr data-text="{{.Name}} {{.Project}}">
+    <td><strong>{{.Name}}</strong>{{if .Internal}} <span class="badge plain">interne</span>{{end}}</td>
+    <td class="muted">{{.Driver}}</td>
+    <td>{{if .Project}}<a href="/s/{{.Project}}">{{.Project}}</a>{{else}}<span class="faint">—</span>{{end}}</td>
+    <td class="muted">{{len .Containers}}</td>
+  </tr>{{end}}</tbody>
+</table></div>
+{{end}}{{end}}
+
+{{if eq $d.Tab "volumes"}}
+{{if not $caps.Volumes}}<div class="error-box">Le proxy Docker refuse l'accès aux volumes (VOLUMES=1).</div>{{else}}
+<div class="section-bar"><span class="grow"></span><button class="btn" data-prune="volumes" data-confirm="Supprimer les volumes anonymes inutilisés ? Les volumes nommés sont gardés.">Supprimer les anonymes inutilisés</button></div>
+<div class="table-wrap"><table data-filterable>
+  <thead><tr><th>Volume</th><th>Pile</th><th>Utilisé par</th><th class="num">Créé</th></tr></thead>
+  <tbody>{{range $d.Volumes}}
+  <tr data-text="{{.Name}} {{.Project}}">
+    <td class="mono">{{.Name}}</td>
+    <td>{{if .Project}}<a href="/s/{{.Project}}">{{.Project}}</a>{{else}}<span class="faint">—</span>{{end}}</td>
+    <td>{{if .Users}}{{range $i, $c := .Users}}{{if $i}}, {{end}}{{$c.Name}}{{end}}{{else}}<span class="faint">aucun</span>{{end}}</td>
+    <td class="num muted">{{.Created}}</td>
+  </tr>{{end}}</tbody>
+</table></div>
+{{end}}{{end}}
+{{end}}

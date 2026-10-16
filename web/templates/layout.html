@@ -1,0 +1,52 @@
+{{define "layout"}}<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{.Title}} · dockerr</title>
+<meta name="theme-color" content="#f5f6f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1012" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/icons/icon.svg?v={{.Version}}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v={{.Version}}">
+<link rel="stylesheet" href="/static/css/app.css?v={{.Version}}">
+<script src="/static/js/theme.js?v={{.Version}}"></script>
+<script src="/static/js/app.js?v={{.Version}}" defer></script>
+</head>
+<body data-adv="{{if .Advanced}}1{{end}}">
+{{template "icons"}}
+<div class="app">
+  <nav class="side" aria-label="Navigation">
+    <a class="brand" href="/">{{template "logo"}}dockerr</a>
+    {{template "nav-links" .}}
+    <div class="grow"></div>
+    <div class="who" title="{{.User}}">{{.User}}</div>
+  </nav>
+  <main class="main">{{template "content" .}}</main>
+  <nav class="tabbar" aria-label="Navigation">{{template "nav-links" .}}</nav>
+</div>
+<div class="activity" id="activity" hidden role="status" aria-live="polite"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<dialog id="confirm">
+  <form method="dialog">
+    <div class="dlg-body"><h2></h2><p></p></div>
+    <div class="dlg-foot"><button class="btn" value="no">Annuler</button><button class="btn danger solid" value="yes"></button></div>
+  </form>
+</dialog>
+</body>
+</html>{{end}}
+
+{{define "nav-links"}}
+<a class="nav-link" href="/" {{if eq .Nav "stacks"}}aria-current="page"{{end}}><svg class="i"><use href="#i-layers"/></svg><span>Piles</span></a>
+{{if .Advanced}}
+<a class="nav-link" href="/resources" {{if eq .Nav "resources"}}aria-current="page"{{end}}><svg class="i"><use href="#i-box"/></svg><span>Ressources</span></a>
+<a class="nav-link" href="/network" {{if eq .Nav "network"}}aria-current="page"{{end}}><svg class="i"><use href="#i-network"/></svg><span>Réseau</span></a>
+{{end}}
+<a class="nav-link" href="/settings" {{if eq .Nav "settings"}}aria-current="page"{{end}}><svg class="i"><use href="#i-sliders"/></svg><span>Réglages</span></a>
+{{end}}
+
+{{define "logo"}}<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M9 11.5 16 8l7 3.5-7 3.5z" fill="var(--accent-fg)"/><path d="m9 16 7 3.5 7-3.5M9 20.5l7 3.5 7-3.5" fill="none" stroke="var(--accent-fg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
+
+{{define "i"}}<svg class="i{{if .s}} s{{end}}" aria-hidden="true"><use href="#i-{{.n}}"/></svg>{{end}}

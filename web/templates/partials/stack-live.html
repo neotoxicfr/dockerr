@@ -1,0 +1,89 @@
+{{define "stack-live"}}{{$d := .Data}}{{$st := $d.Stack}}{{$caps := .Caps}}{{$adv := .Advanced}}
+<header class="bar">
+  <a class="back" href="/" aria-label="Piles"><svg class="i"><use href="#i-back"/></svg></a>
+  <h1><span class="name">{{$st.Name}}</span> <span class="pill"><span class="dot {{$st.State}}"></span>{{stateLabel $st.State}}{{if $st.Total}} · {{$st.Up}}/{{$st.Total}}{{end}}</span></h1>
+  <div class="bar-actions">
+    {{if $st.Self}}<span class="pill" title="Les opérations sur cette pile arrêteraient dockerr">Pile de dockerr</span>{{else}}
+    {{if $st.Updates}}<button class="btn primary" data-op="update" data-stack="{{$st.Name}}" {{if not $caps.Compose}}aria-disabled="true"{{end}}><svg class="i s"><use href="#i-update"/></svg>Mettre à jour</button>{{end}}
+    {{if eq $st.Up 0}}
+    <button class="btn {{if not $st.Updates}}primary{{end}}" data-op="start" data-stack="{{$st.Name}}" {{if not $st.File}}aria-disabled="true"{{end}}><svg class="i s"><use href="#i-play"/></svg>Démarrer</button>
+    {{else}}
+    <button class="btn" data-op="restart" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-restart"/></svg>Redémarrer</button>
+    <button class="btn" data-op="stop" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-stop"/></svg>Arrêter</button>
+    {{end}}
+    <div class="menu-wrap">
+      <button class="btn icon" data-menu aria-label="Plus d'actions" aria-haspopup="menu"><svg class="i"><use href="#i-more"/></svg></button>
+      <div class="menu" role="menu" hidden>
+        {{if not $st.Updates}}<button role="menuitem" data-op="update" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-update"/></svg>Mettre à jour</button>{{end}}
+        <button role="menuitem" data-op="recreate" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-recreate"/></svg>Recréer les conteneurs</button>
+        <button role="menuitem" data-op="repair" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-wrench"/></svg>Réparer le réseau</button>
+        {{if $adv}}
+        <button role="menuitem" data-op="pull" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-download"/></svg>Télécharger les images</button>
+        <hr>
+        <button role="menuitem" class="danger" data-op="down" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-trash"/></svg>Supprimer les conteneurs</button>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+</header>
+<nav class="tabs">
+  <a href="/s/{{$st.Name}}" {{if eq $d.Tab "services"}}aria-current="page"{{end}}>Services</a>
+  {{if $st.File}}<a href="/s/{{$st.Name}}?tab=compose" {{if eq $d.Tab "compose"}}aria-current="page"{{end}}>Compose</a>{{end}}
+  {{if $adv}}<a href="/s/{{$st.Name}}?tab=history" {{if eq $d.Tab "history"}}aria-current="page"{{end}}>Historique</a>{{end}}
+</nav>
+{{if $st.LoadErr}}<div class="error-box">{{$st.LoadErr}}</div>{{end}}
+{{if eq $d.Tab "services"}}
+<div class="svcs">
+{{range $st.Services}}{{$svc := .}}
+  {{if .Containers}}{{range .Containers}}{{template "service-card" dict "S" $svc "C" . "D" $d "Adv" $adv "Caps" $caps}}{{end}}
+  {{else}}{{template "service-card" dict "S" $svc "C" nil "D" $d "Adv" $adv "Caps" $caps}}{{end}}
+{{end}}
+</div>
+{{end}}
+{{end}}
+
+{{define "service-card"}}{{$s := .S}}{{$c := .C}}{{$d := .D}}{{$st := $d.Stack}}
+<div class="card svc">
+  <div>
+    <div class="svc-head">
+      {{if $c}}<span class="dot {{ctrClass $c}}"></span>{{else}}<span class="dot"></span>{{end}}
+      <strong>{{$s.Name}}</strong>
+      <span class="svc-state {{if $c}}{{if eq (ctrClass $c) "bad"}}bad{{end}}{{end}}">{{if $c}}{{ctrLabel $c}}{{else}}Pas créé{{end}}</span>
+    </div>
+    <div class="svc-sub">
+      <span class="mono" title="{{if $c}}{{$c.Image}}{{else}}{{$s.Image}}{{end}}">{{if $c}}{{imageTag $c.Image}}{{else}}{{imageTag $s.Image}}{{end}}</span>
+      {{if $s.Update}}<span class="badge upd"><svg class="i s"><use href="#i-update"/></svg>Nouvelle image</span>{{end}}
+      {{if $c}}{{if $c.NetParent}}
+        {{if $c.NetLost}}<span class="netline bad"><svg class="i s"><use href="#i-alert"/></svg>Réseau de {{$c.NetParent}} perdu <button class="btn sm" data-op="repair" data-stack="{{$st.Name}}">Réparer</button></span>
+        {{else}}<span class="netline" title="network_mode: container"><svg class="i s"><use href="#i-link"/></svg>via {{$c.NetParent}}</span>{{end}}
+      {{end}}
+      {{with index $d.Children $c.ID}}<span class="netline" title="Ces conteneurs utilisent son réseau"><svg class="i s"><use href="#i-link"/></svg>porte {{range $i, $x := .}}{{if $i}}, {{end}}{{$x.Name}}{{end}}</span>{{end}}{{end}}
+    </div>
+  </div>
+  <div class="svc-meta">
+    {{if $c}}{{range $c.Ports}}<a class="chip" href="http://{{$d.PortHost}}:{{.Public}}" target="_blank" rel="noopener" title="{{.Public}} → {{.Private}}/{{.Proto}}">{{.Public}}</a>{{end}}
+    {{if $c.Running}}<span class="svc-res">{{cpu $c.CPU}} · {{bytes $c.Mem}}</span>{{end}}{{end}}
+  </div>
+  <div class="svc-act">
+    {{if and $c $d.DozzleURL}}<a class="btn icon ghost" href="{{$d.DozzleURL}}/container/{{short $c.ID}}" target="_blank" rel="noopener" title="Logs" aria-label="Logs de {{$s.Name}}"><svg class="i"><use href="#i-logs"/></svg></a>{{end}}
+    <div class="menu-wrap">
+      {{if not $st.Self}}<button class="btn icon ghost" data-menu aria-label="Actions sur {{$s.Name}}" aria-haspopup="menu"><svg class="i"><use href="#i-more"/></svg></button>
+      <div class="menu" role="menu" hidden>
+        {{if and $c $c.Running}}
+        <button role="menuitem" data-op="restart" data-stack="{{$st.Name}}" data-service="{{$s.Name}}"><svg class="i s"><use href="#i-restart"/></svg>Redémarrer</button>
+        <button role="menuitem" data-op="stop" data-stack="{{$st.Name}}" data-service="{{$s.Name}}"><svg class="i s"><use href="#i-stop"/></svg>Arrêter</button>
+        {{else}}
+        <button role="menuitem" data-op="start" data-stack="{{$st.Name}}" data-service="{{$s.Name}}"><svg class="i s"><use href="#i-play"/></svg>Démarrer</button>
+        {{end}}
+        <button role="menuitem" data-op="update" data-stack="{{$st.Name}}" data-service="{{$s.Name}}"><svg class="i s"><use href="#i-update"/></svg>Mettre à jour</button>
+        <button role="menuitem" data-op="recreate" data-stack="{{$st.Name}}" data-service="{{$s.Name}}"><svg class="i s"><use href="#i-recreate"/></svg>Recréer</button>
+        {{if and $c .Adv}}<hr>
+        {{if $c.Running}}<a role="menuitem" href="/c/{{short $c.ID}}/terminal"><svg class="i s"><use href="#i-terminal"/></svg>Terminal</a>{{end}}
+        <a role="menuitem" href="/c/{{short $c.ID}}"><svg class="i s"><use href="#i-info"/></svg>Détails</a>
+        {{end}}
+      </div>{{end}}
+    </div>
+  </div>
+</div>
+{{end}}

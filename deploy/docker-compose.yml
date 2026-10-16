@@ -1,0 +1,72 @@
+# dockerr behind Traefik + Authelia, with its own socket proxy.
+#
+# The proxy gets only what compose needs. Keep it separate from the
+# read-only proxy other tools (Traefik, Dozzle) use: these rights amount to
+# root on the host.
+services:
+  dockerr-socket:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: dockerr-socket
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      NETWORKS: 1
+      VOLUMES: 1
+      POST: 1
+      ALLOW_START: 1
+      ALLOW_STOP: 1
+      ALLOW_RESTARTS: 1
+      INFO: 1
+      VERSION: 1
+      EVENTS: 1
+      PING: 1
+      # Container terminal: also set DOCKERR_EXEC=1 below.
+      EXEC: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - dockerr-socket
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  dockerr:
+    image: dockerr:dev
+    container_name: dockerr
+    depends_on:
+      - dockerr-socket
+    # Compose files are usually owned by root; dockerr needs to write them.
+    user: "0:0"
+    environment:
+      DOCKER_HOST: tcp://dockerr-socket:2375
+      # Mounted at the same path as on the host, so relative bind mounts in
+      # compose files resolve to the same place.
+      DOCKERR_STACKS_DIR: /mnt/docker
+      # Only Traefik may set Remote-User. A name is resolved on the Docker network.
+      DOCKERR_TRUSTED_PROXIES: traefik
+      # DOCKERR_REQUIRE_GROUP: admins
+      # DOCKERR_DOZZLE_URL: https://log.example.com
+      # DOCKERR_EXEC: 1
+      TZ: Europe/Paris
+    volumes:
+      - /mnt/docker:/mnt/docker
+      - ./data:/data
+      # Private registries for update checks and pulls:
+      # - /root/.docker/config.json:/root/.docker/config.json:ro
+    networks:
+      - proxy
+      - dockerr-socket
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.dockerr.rule: Host(`dockerr.example.com`)
+      traefik.http.routers.dockerr.middlewares: authelia@file
+      traefik.http.services.dockerr.loadbalancer.server.port: "8080"
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+networks:
+  dockerr-socket:
+    internal: true
+  proxy:
+    external: true

@@ -1,0 +1,34 @@
+{{define "content"}}{{$d := .Data}}
+<header class="bar"><h1>Réseau</h1></header>
+{{if $d.Err}}<div class="error-box">{{$d.Err}}</div>{{end}}
+{{if $d.Groups}}
+<h2 class="section">Réseaux partagés</h2>
+<div class="groups">
+{{range $d.Groups}}
+  <div class="card group">
+    <div class="parent">
+      {{if .Parent}}<span class="dot {{ctrClass .Parent}}"></span><a href="/c/{{short .Parent.ID}}">{{.Parent.Name}}</a>{{if .Parent.Project}} <span class="faint">{{.Parent.Project}}</span>{{end}}
+      {{else}}<span class="dot bad"></span><span class="mono">{{.Missing}}</span> <span class="badge bad">introuvable</span>{{end}}
+    </div>
+    <ul class="tree">{{range .Children}}
+      <li><span class="dot {{ctrClass .}}"></span><a href="/c/{{short .ID}}">{{.Name}}</a>{{if .NetLost}}<span class="bad">réseau perdu</span>{{if .Project}} <button class="btn sm" data-op="repair" data-stack="{{.Project}}">Réparer</button>{{end}}{{end}}</li>
+    {{end}}</ul>
+  </div>
+{{end}}
+</div>
+{{end}}
+{{if $d.Host}}
+<h2 class="section">Réseau de l'hôte</h2>
+<div class="card net host-card"><div class="members">{{range $d.Host}}<a class="chip" href="/c/{{short .ID}}"><span class="dot {{ctrClass .}}"></span>{{.Name}}</a>{{end}}</div></div>
+{{end}}
+<h2 class="section">Réseaux</h2>
+<div class="nets">
+{{range $d.Networks}}
+  <div class="card net">
+    <h3>{{.Name}}{{if .Internal}} <span class="badge plain">interne</span>{{end}}</h3>
+    <div class="faint">{{.Driver}}{{if .Project}} · {{.Project}}{{end}}</div>
+    {{if .Containers}}<div class="members">{{range .Containers}}<a class="chip" href="/c/{{short .ID}}"><span class="dot {{ctrClass .}}"></span>{{.Name}}</a>{{end}}</div>{{end}}
+  </div>
+{{end}}
+</div>
+{{end}}

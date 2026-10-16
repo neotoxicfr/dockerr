@@ -1,0 +1,410 @@
+package server
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"slices"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/docker/compose/v5/pkg/api"
+	"github.com/moby/moby/client"
+
+	"github.com/neotoxicfr/dockerr/internal/netdeps"
+	"github.com/neotoxicfr/dockerr/internal/stacks"
+)
+
+// advancedOnly guards the advanced-mode pages.
+func (s *Server) advancedOnly(w http.ResponseWriter, r *http.Request) bool {
+	if s.advanced(r) {
+		return true
+	}
+	if r.Method == http.MethodGet {
+		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+	} else {
+		jsonError(w, http.StatusForbidden, "réservé au mode avancé")
+	}
+	return false
+}
+
+type imageRow struct {
+	ID      string
+	Tags    []string
+	Size    int64
+	Created time.Time
+	Used    int
+}
+
+type networkRow struct {
+	ID, Name, Driver, Project string
+	Internal                  bool
+	Containers                []*stacks.Container
+}
+
+type volumeRow struct {
+	Name, Driver, Project string
+	Created               string
+	Users                 []*stacks.Container
+}
+
+type resourcesData struct {
+	Tab        string
+	Containers []*stacks.Container
+	Images     []imageRow
+	Networks   []networkRow
+	Volumes    []volumeRow
+	Err        string
+}
+
+func (s *Server) resources(w http.ResponseWriter, r *http.Request) {
+	if !s.advancedOnly(w, r) {
+		return
+	}
+	ctx := r.Context()
+	d := resourcesData{Tab: r.URL.Query().Get("tab")}
+	if !slices.Contains([]string{"containers", "images", "networks", "volumes"}, d.Tab) {
+		d.Tab = "containers"
+	}
+	all, _, err := s.snapshot(ctx)
+	if err != nil {
+		d.Err = err.Error()
+		s.render(w, r, "resources", "Ressources", "resources", d)
+		return
+	}
+	switch d.Tab {
+	case "containers":
+		d.Containers = all
+		sort.Slice(d.Containers, func(i, j int) bool { return d.Containers[i].Name < d.Containers[j].Name })
+	case "images":
+		d.Images, err = s.imageRows(ctx, all)
+	case "networks":
+		d.Networks, err = s.networkRows(ctx, all)
+	case "volumes":
+		d.Volumes, err = s.volumeRows(ctx, all)
+	}
+	if err != nil {
+		d.Err = err.Error()
+	}
+	s.render(w, r, "resources", "Ressources", "resources", d)
+}
+
+func (s *Server) imageRows(ctx context.Context, all []*stacks.Container) ([]imageRow, error) {
+	res, err := s.docker.API.ImageList(ctx, client.ImageListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	used := map[string]int{}
+	for _, c := range all {
+		used[c.ImageID]++
+	}
+	var out []imageRow
+	for _, im := range res.Items {
+		tags := slices.DeleteFunc(slices.Clone(im.RepoTags), func(t string) bool { return t == "<none>:<none>" })
+		out = append(out, imageRow{ID: im.ID, Tags: tags, Size: im.Size, Created: time.Unix(im.Created, 0), Used: used[im.ID]})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if (out[i].Used == 0) != (out[j].Used == 0) {
+			return out[i].Used == 0
+		}
+		return out[i].Size > out[j].Size
+	})
+	return out, nil
+}
+
+func (s *Server) networkRows(ctx context.Context, all []*stacks.Container) ([]networkRow, error) {
+	res, err := s.docker.API.NetworkList(ctx, client.NetworkListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var out []networkRow
+	for _, n := range res.Items {
+		row := networkRow{ID: n.ID, Name: n.Name, Driver: n.Driver, Internal: n.Internal, Project: n.Labels[api.ProjectLabel]}
+		for _, c := range all {
+			if slices.Contains(c.Networks, n.Name) {
+				row.Containers = append(row.Containers, c)
+			}
+		}
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
+func (s *Server) volumeRows(ctx context.Context, all []*stacks.Container) ([]volumeRow, error) {
+	res, err := s.docker.API.VolumeList(ctx, client.VolumeListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var out []volumeRow
+	for _, v := range res.Items {
+		row := volumeRow{Name: v.Name, Driver: v.Driver, Project: v.Labels[api.ProjectLabel], Created: v.CreatedAt}
+		for _, c := range all {
+			if slices.Contains(c.Volumes, v.Name) {
+				row.Users = append(row.Users, c)
+			}
+		}
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if (len(out[i].Users) == 0) != (len(out[j].Users) == 0) {
+			return len(out[i].Users) == 0
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out, nil
+}
+
+type kv struct{ K, V string }
+
+type ctrView struct {
+	*stacks.Container
+	Cmd          string
+	Created      string
+	Started      string
+	Restart      string
+	RestartCount int
+	Mounts       []kv
+	Env          []kv
+	LabelList    []kv
+	IPs          []kv
+	Children     []*stacks.Container
+	Raw          string
+	DozzleURL    string
+	ExecEnabled  bool
+}
+
+func (s *Server) findContainer(w http.ResponseWriter, r *http.Request) (*stacks.Container, []*stacks.Container, bool) {
+	id := r.PathValue("id")
+	all, _, err := s.snapshot(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return nil, nil, false
+	}
+	for _, c := range all {
+		if c.ID == id || c.Name == id || (len(id) >= 12 && strings.HasPrefix(c.ID, id)) {
+			return c, all, true
+		}
+	}
+	http.NotFound(w, r)
+	return nil, nil, false
+}
+
+func (s *Server) containerPage(w http.ResponseWriter, r *http.Request) {
+	if !s.advancedOnly(w, r) {
+		return
+	}
+	c, all, ok := s.findContainer(w, r)
+	if !ok {
+		return
+	}
+	res, err := s.docker.API.ContainerInspect(r.Context(), c.ID, client.ContainerInspectOptions{})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	in := res.Container
+	v := ctrView{Container: c, Created: isoDate(in.Created), RestartCount: in.RestartCount, Children: netdeps.Children(c, all),
+		DozzleURL: s.cfg.DozzleURL, ExecEnabled: s.cfg.ExecEnabled && s.docker.Caps.Exec}
+	if in.State != nil {
+		v.Started = isoDate(in.State.StartedAt)
+	}
+	if in.Config != nil {
+		v.Cmd = strings.Join(append(slices.Clone(in.Config.Entrypoint), in.Config.Cmd...), " ")
+		for _, e := range in.Config.Env {
+			k, val, _ := strings.Cut(e, "=")
+			v.Env = append(v.Env, kv{k, val})
+		}
+		for k, val := range in.Config.Labels {
+			v.LabelList = append(v.LabelList, kv{k, val})
+		}
+		sort.Slice(v.LabelList, func(i, j int) bool { return v.LabelList[i].K < v.LabelList[j].K })
+	}
+	if in.HostConfig != nil {
+		v.Restart = string(in.HostConfig.RestartPolicy.Name)
+	}
+	for _, m := range in.Mounts {
+		src := m.Source
+		if m.Name != "" {
+			src = m.Name
+		}
+		mode := "lecture-écriture"
+		if !m.RW {
+			mode = "lecture seule"
+		}
+		v.Mounts = append(v.Mounts, kv{src + " → " + m.Destination, string(m.Type) + ", " + mode})
+	}
+	if in.NetworkSettings != nil {
+		for name, ep := range in.NetworkSettings.Networks {
+			if ep == nil {
+				continue
+			}
+			ip := ""
+			if ep.IPAddress.IsValid() {
+				ip = ep.IPAddress.String()
+			}
+			v.IPs = append(v.IPs, kv{name, ip})
+		}
+		sort.Slice(v.IPs, func(i, j int) bool { return v.IPs[i].K < v.IPs[j].K })
+	}
+	var raw any
+	if json.Unmarshal(res.Raw, &raw) == nil {
+		b, _ := json.MarshalIndent(raw, "", "  ")
+		v.Raw = string(b)
+	}
+	s.render(w, r, "container", c.Name, "resources", v)
+}
+
+func (s *Server) containerAction(w http.ResponseWriter, r *http.Request) {
+	if !s.advancedOnly(w, r) {
+		return
+	}
+	c, _, ok := s.findContainer(w, r)
+	if !ok {
+		return
+	}
+	ctx := r.Context()
+	var err error
+	switch r.FormValue("action") {
+	case "start":
+		_, err = s.docker.API.ContainerStart(ctx, c.ID, client.ContainerStartOptions{})
+	case "stop":
+		_, err = s.docker.API.ContainerStop(ctx, c.ID, client.ContainerStopOptions{})
+	case "restart":
+		_, err = s.docker.API.ContainerRestart(ctx, c.ID, client.ContainerRestartOptions{})
+	case "remove":
+		_, err = s.docker.API.ContainerRemove(ctx, c.ID, client.ContainerRemoveOptions{Force: true})
+	default:
+		jsonError(w, http.StatusBadRequest, "action inconnue")
+		return
+	}
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (s *Server) prune(w http.ResponseWriter, r *http.Request) {
+	if !s.advancedOnly(w, r) {
+		return
+	}
+	ctx := r.Context()
+	var freed uint64
+	var n int
+	var err error
+	switch r.FormValue("kind") {
+	case "images":
+		var res client.ImagePruneResult
+		res, err = s.docker.API.ImagePrune(ctx, client.ImagePruneOptions{Filters: make(client.Filters).Add("dangling", "false")})
+		freed, n = res.Report.SpaceReclaimed, len(res.Report.ImagesDeleted)
+	case "networks":
+		var res client.NetworkPruneResult
+		res, err = s.docker.API.NetworkPrune(ctx, client.NetworkPruneOptions{})
+		n = len(res.Report.NetworksDeleted)
+	case "volumes":
+		// Anonymous volumes only: named ones hold data someone chose to keep.
+		var res client.VolumePruneResult
+		res, err = s.docker.API.VolumePrune(ctx, client.VolumePruneOptions{})
+		freed, n = res.Report.SpaceReclaimed, len(res.Report.VolumesDeleted)
+	case "containers":
+		var res client.ContainerPruneResult
+		res, err = s.docker.API.ContainerPrune(ctx, client.ContainerPruneOptions{})
+		freed, n = res.Report.SpaceReclaimed, len(res.Report.ContainersDeleted)
+	default:
+		jsonError(w, http.StatusBadRequest, "type inconnu")
+		return
+	}
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"removed": n, "freed": humanBytes(freed)})
+}
+
+func (s *Server) imageRemove(w http.ResponseWriter, r *http.Request) {
+	if !s.advancedOnly(w, r) {
+		return
+	}
+	if _, err := s.docker.API.ImageRemove(r.Context(), r.PathValue("id"), client.ImageRemoveOptions{PruneChildren: true}); err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+type shareGroup struct {
+	Parent   *stacks.Container
+	Missing  string // parent reference when the parent is gone
+	Children []*stacks.Container
+}
+
+type networkData struct {
+	Groups   []shareGroup
+	Networks []networkRow
+	Host     []*stacks.Container
+	Err      string
+}
+
+func (s *Server) networkPage(w http.ResponseWriter, r *http.Request) {
+	if !s.advancedOnly(w, r) {
+		return
+	}
+	var d networkData
+	all, _, err := s.snapshot(r.Context())
+	if err != nil {
+		d.Err = err.Error()
+		s.render(w, r, "network", "Réseau", "network", d)
+		return
+	}
+	byParent := map[string]*shareGroup{}
+	var order []string
+	for _, c := range all {
+		ref := netdeps.Ref(c.NetworkMode)
+		switch {
+		case c.NetworkMode == "host":
+			d.Host = append(d.Host, c)
+		case ref != "":
+			key := c.NetParent
+			g := byParent[key]
+			if g == nil {
+				g = &shareGroup{Missing: key}
+				for _, p := range all {
+					if p.Name == key {
+						g.Parent, g.Missing = p, ""
+					}
+				}
+				byParent[key] = g
+				order = append(order, key)
+			}
+			g.Children = append(g.Children, c)
+		}
+	}
+	sort.Strings(order)
+	for _, k := range order {
+		d.Groups = append(d.Groups, *byParent[k])
+	}
+	if s.docker.Caps.Networks {
+		rows, err := s.networkRows(r.Context(), all)
+		if err != nil {
+			d.Err = err.Error()
+		}
+		for _, n := range rows {
+			if n.Name == "none" || n.Name == "host" {
+				continue
+			}
+			d.Networks = append(d.Networks, n)
+		}
+	}
+	s.render(w, r, "network", "Réseau", "network", d)
+}
+
+// isoDate formats a Docker RFC 3339 timestamp for display.
+func isoDate(s string) string {
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil || t.Year() < 2000 {
+		return ""
+	}
+	return t.Local().Format("02/01/2006 15:04:05")
+}

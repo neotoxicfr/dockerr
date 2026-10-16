@@ -1,0 +1,68 @@
+{{define "content"}}{{$d := .Data}}
+<header class="bar"><h1>Réglages</h1></header>
+<div class="settings">
+  <section class="card">
+    <form class="setting" method="post" action="/settings/mode">
+      <div class="txt"><strong>Mode avancé</strong><span>Ressources Docker, réseau, historique, terminal</span></div>
+      <input type="hidden" name="advanced" value="{{if .Advanced}}0{{else}}1{{end}}">
+      <label class="switch"><input type="checkbox" {{if .Advanced}}checked{{end}} data-autosubmit aria-label="Mode avancé"><span></span></label>
+    </form>
+    <div class="setting">
+      <div class="txt"><strong>Thème</strong></div>
+      <div class="seg" role="tablist" id="theme">
+        <button role="tab" data-theme-set="auto">Auto</button>
+        <button role="tab" data-theme-set="light">Clair</button>
+        <button role="tab" data-theme-set="dark">Sombre</button>
+      </div>
+    </div>
+    <div class="setting">
+      <div class="txt"><strong>Mises à jour des images</strong><span>{{if $d.Checking}}Vérification en cours{{else if $d.LastCheck.IsZero}}Pas encore vérifiées{{else}}Vérifiées {{since $d.LastCheck}}{{end}}</span></div>
+      <button class="btn" data-check-updates>Vérifier</button>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section">Accès Docker</h2>
+    <div class="card">
+      <div class="kv">
+        <div class="k">Point d'accès</div><div class="mono">{{$d.Host}}</div>
+        <div class="k">Docker</div><div>{{$d.DaemonVersion}} <span class="faint">API {{$d.APIVersion}}</span></div>
+        <div class="k">Dossier des piles</div><div class="mono">{{$d.StacksDir}}</div>
+      </div>
+    </div>
+    <div class="card gap-top">
+      <ul class="caps">
+        {{range $d.Caps}}<li>{{if .OK}}<svg class="i s ok"><use href="#i-check"/></svg>{{else}}<svg class="i s no"><use href="#i-x"/></svg>{{end}}<span {{if not .OK}}class="muted"{{end}}>{{.Name}}</span>{{if not .OK}}<code>{{.Env}}</code>{{end}}</li>{{end}}
+        <li>{{if $d.ExecEnabled}}<svg class="i s ok"><use href="#i-check"/></svg>{{else}}<svg class="i s no"><use href="#i-x"/></svg>{{end}}<span {{if not $d.ExecEnabled}}class="muted"{{end}}>Terminal activé dans dockerr</span>{{if not $d.ExecEnabled}}<code>DOCKERR_EXEC=1</code>{{end}}</li>
+      </ul>
+    </div>
+  </section>
+
+  {{if $d.RecentOps}}
+  <section>
+    <h2 class="section">Activité</h2>
+    <div class="table-wrap"><table>
+      <tbody>{{range $d.RecentOps}}
+        <tr><td><span class="dot {{if not .Done}}warn{{else if .Err}}bad{{else}}ok{{end}}"></span></td>
+          <td><a href="/s/{{.Stack}}"><strong>{{.Stack}}</strong></a>{{if .Service}} <span class="muted">· {{.Service}}</span>{{end}}</td>
+          <td>{{.Label}}{{if .Err}} <span class="faint" title="{{.Err}}">· échec</span>{{end}}</td>
+          <td class="muted">{{.User}}</td><td class="num muted">{{since .Started}}</td></tr>
+      {{end}}</tbody>
+    </table></div>
+  </section>
+  {{end}}
+
+  {{if and .Advanced $d.ExecLog}}
+  <section>
+    <h2 class="section">Sessions terminal</h2>
+    <div class="table-wrap"><table>
+      <tbody>{{range $d.ExecLog}}
+        <tr><td><strong>{{.Container}}</strong></td><td class="muted">{{.User}}</td><td class="num muted">{{datetime .Started}}</td>
+          <td class="num muted">{{if .Ended.IsZero}}en cours{{else}}{{.Ended.Sub .Started}}{{end}}</td></tr>
+      {{end}}</tbody>
+    </table></div>
+  </section>
+  {{end}}
+  <p class="faint">dockerr {{.Version}}</p>
+</div>
+{{end}}

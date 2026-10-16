@@ -1,0 +1,16 @@
+{{define "content"}}{{$c := .Data.C}}
+<header class="bar">
+  <a class="back" href="/c/{{short $c.ID}}" aria-label="Retour"><svg class="i"><use href="#i-back"/></svg></a>
+  <h1><span class="name">{{$c.Name}}</span></h1>
+</header>
+{{if .Data.Enabled}}
+<link rel="stylesheet" href="/static/vendor/xterm.css?v={{.Version}}">
+<div class="term" id="term" data-id="{{short $c.ID}}"></div>
+<script type="module" src="/static/js/term.js?v={{.Version}}"></script>
+{{else}}
+<div class="card empty">
+  <p>Le terminal est désactivé.</p>
+  <p class="faint">Il faut <code>DOCKERR_EXEC=1</code> dans dockerr{{if .Data.ConfigOn}} et <code>EXEC=1</code> sur le proxy Docker{{end}}.</p>
+</div>
+{{end}}
+{{end}}

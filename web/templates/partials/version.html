@@ -1,0 +1,10 @@
+{{define "version"}}{{$v := .Data}}
+<div class="bar">
+  <h2>{{datetime $v.Created}} <span class="faint byline">· {{$v.Author}}</span></h2>
+  <button class="btn" data-restore="{{$v.ID}}" data-confirm="Remplacer le fichier actuel par cette version ?">Restaurer</button>
+</div>
+{{if $v.Prev}}{{if $v.Lines}}{{template "diff-lines" $v.Lines}}{{else}}<p class="faint">Identique à la version précédente.</p>{{end}}
+{{else}}<pre class="diff">{{range $v.Lines}}{{if .}}<div><span class="ln">{{.New}}</span>{{.Text}}</div>{{end}}{{end}}</pre>{{end}}
+{{end}}
+
+{{define "diff-lines"}}<pre class="diff">{{range .}}{{if .}}<div class="{{if eq (printf "%c" .Op) "+"}}add{{else if eq (printf "%c" .Op) "-"}}del{{end}}"><span class="ln">{{if .New}}{{.New}}{{else}}{{.Old}}{{end}}</span>{{printf "%c" .Op}} {{.Text}}</div>{{else}}<div class="gap">⋯</div>{{end}}{{end}}</pre>{{end}}

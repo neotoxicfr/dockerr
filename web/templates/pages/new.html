@@ -1,0 +1,26 @@
+{{define "content"}}
+<header class="bar">
+  <a class="back" href="/" aria-label="Piles"><svg class="i"><use href="#i-back"/></svg></a>
+  <h1>Nouvelle pile</h1>
+</header>
+<div id="new-stack" data-compose-ok="{{if .Caps.Compose}}1{{end}}">
+  <div class="field">
+    <label for="ns-name">Nom</label>
+    <input type="text" id="ns-name" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ma-pile" pattern="[a-z0-9][a-z0-9_\-]*" maxlength="64">
+    <span class="err" id="ns-name-err" hidden></span>
+  </div>
+  <div class="editor-bar">
+    <div class="seg" role="tablist">
+      <button role="tab" aria-selected="true" data-file="compose">compose.yaml</button>
+      <button role="tab" data-file="env">.env</button>
+    </div>
+    <div class="status" id="ed-status" aria-live="polite"></div>
+    <div class="actions">
+      <button class="btn" id="ns-create">Créer</button>
+      <button class="btn primary" id="ns-start">Créer et démarrer</button>
+    </div>
+  </div>
+  <div class="editor" id="editor"></div>
+</div>
+<script type="module" src="/static/js/editor.js?v={{.Version}}"></script>
+{{end}}
