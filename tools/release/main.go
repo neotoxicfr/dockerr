@@ -184,7 +184,7 @@ func image(base v1.ImageIndex, p v1.Platform, bin, version, revision string, cre
 	must(err)
 	var img v1.Image
 	for _, d := range im.Manifests {
-		if d.Platform != nil && d.Platform.OS == p.OS && d.Platform.Architecture == p.Architecture && d.Platform.Variant == p.Variant {
+		if d.Platform != nil && d.Platform.OS == p.OS && d.Platform.Architecture == p.Architecture && sameVariant(d.Platform.Variant, p.Variant) {
 			img, err = base.Image(d.Digest)
 			must(err)
 		}
@@ -293,6 +293,17 @@ func verify(ref name.Tag) {
 func ghcrAuth() authn.Authenticator {
 	user := out("gh", "api", "user", "-q", ".login")
 	return &authn.Basic{Username: user, Password: out("gh", "auth", "token")}
+}
+
+// sameVariant treats arm64 "v8" and no variant as the same.
+func sameVariant(a, b string) bool {
+	norm := func(v string) string {
+		if v == "v8" {
+			return ""
+		}
+		return v
+	}
+	return norm(a) == norm(b)
 }
 
 func suffix(p v1.Platform) string {
