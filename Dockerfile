@@ -4,6 +4,9 @@
 FROM --platform=$BUILDPLATFORM golang:1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS build
 ARG TARGETOS TARGETARCH VERSION=dev REVISION=
 WORKDIR /src
+# go.mod may ask for a newer patch toolchain (a security release) before its
+# image is published; the official image pins GOTOOLCHAIN=local otherwise.
+ENV GOTOOLCHAIN=auto
 
 COPY go.mod go.sum ./
 RUN go mod download

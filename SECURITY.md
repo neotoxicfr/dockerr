@@ -59,9 +59,10 @@ runs as non-root by default. Editing compose files owned by root needs
 
 - Every GitHub Action is pinned to a full commit SHA.
 - CI runs the race tests, golangci-lint, `govulncheck` and a Trivy filesystem
-  scan on every pull request, push to `dev` and release tag. No image is
-  published unless it passes.
+  scan on every pull request and push to `dev`; the `:dev` image is published
+  only when it passes. Releases are built locally by `tools/release`, which
+  runs the same checks first and refuses a dirty or unpushed tree.
 - The editor and terminal bundles (CodeMirror, xterm.js) are vendored, built
   from a pinned `package-lock.json`; nothing loads from a CDN.
-- Dependabot watches Go modules, the Dockerfile and the workflows, with a
-  week of cooldown.
+- Dependabot watches the Go modules (app and release tool), the Dockerfile,
+  the workflows and the vendored npm bundles, with a week of cooldown.

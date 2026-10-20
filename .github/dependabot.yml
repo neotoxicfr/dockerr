@@ -29,7 +29,7 @@ updates:
       prefix: "chore(deps)"
 
   - package-ecosystem: "gomod"
-    directory: "/"
+    directories: ["/", "/tools/release"]
     target-branch: "dev"
     schedule:
       interval: "weekly"
@@ -44,3 +44,19 @@ updates:
       default-days: 7
     commit-message:
       prefix: "chore(deps)"
+
+  # Sources of the vendored CodeMirror and xterm bundles: after a bump, run
+  # tools/vendor/build.sh and commit web/static/vendor.
+  - package-ecosystem: "npm"
+    directory: "/tools/vendor"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      vendor-bundles:
+        patterns:
+          - "*"

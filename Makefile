@@ -1,4 +1,4 @@
-.PHONY: dev build test test-race vet lint vuln check vendor docker
+.PHONY: dev build test test-race vet lint vuln check vendor docker release
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/neotoxicfr/dockerr/internal/server.Version=$(VERSION)
@@ -34,3 +34,8 @@ vendor:
 
 docker:
 	docker buildx build --build-arg VERSION=$(VERSION) -t dockerr:dev .
+
+# Local release, no CI: make release V=v1.2.3 NOTES=path/to/notes.md [DRY=1]
+release:
+	go -C tools/release build -o $(CURDIR)/bin/release .
+	bin/release -version $(V) -notes $(NOTES) $(if $(DRY),-dry)

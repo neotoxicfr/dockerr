@@ -2,6 +2,8 @@ module github.com/neotoxicfr/dockerr
 
 go 1.27.2
 
+toolchain go1.27.3
+
 require (
 	github.com/coder/websocket v1.8.15
 	github.com/compose-spec/compose-go/v2 v2.16.1
