@@ -69,9 +69,11 @@ merged into `main` and the tag is pushed.
 ## CI
 
 - `ci.yml`: build, race tests, golangci-lint, govulncheck and a Trivy scan, on
-  pull requests and pushes to `dev`.
-- `docker-publish.yml`: on a push to `dev`, runs `ci.yml` then publishes
-  `:dev` (amd64). It publishes nothing else.
+  every pull request.
+- `docker-publish.yml`: on a push to `dev` it runs `ci.yml`, then publishes
+  `:dev` (amd64). On a `v*` tag it runs `ci.yml`, publishes `X.Y.Z` and
+  `latest` (amd64, arm64, arm/v7), then creates the GitHub release. Nothing is
+  published on a red run.
 
 ## Before pushing
 
@@ -84,18 +86,11 @@ pinned to a full commit SHA.
 
 ## Releases
 
-Releases are built on the maintainer's machine, not in Actions:
-
-```bash
-make release V=v1.2.3 NOTES=notes.md          # DRY=1 to build without pushing
-```
-
-`tools/release` runs `make check`, cross-compiles amd64, arm64 and arm/v7,
-layers each binary on the distroless base pinned in the `Dockerfile`, pushes
-the multi-arch image as `X.Y.Z` and `latest`, tags, creates the GitHub release
-with the notes file and the binaries, then moves `main` to the release.
+Merge `dev` into `main`, push the `vX.Y.Z` tag: the workflow publishes the
+image and creates the release once the image can be pulled.
 
 Semantic versioning. Git tags and release titles carry the `v` (`v1.2.3`);
 image tags do not (`ghcr.io/neotoxicfr/dockerr:1.2.3`). Release notes are
-written by hand: `## <emoji> <Category>` sections and a `### Docker` block
-with the pull command. No generated content.
+written by hand and added to the release the workflow creates:
+`## <emoji> <Category>` sections and a `### Docker` block with the pull
+command. No generated content.
