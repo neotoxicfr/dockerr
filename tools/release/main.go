@@ -83,7 +83,7 @@ func main() {
 	must(err)
 	log.Printf("%s at %s, %s", *version, revision[:7], out("go", "version"))
 
-	dist := filepath.Join("bin", "release", *version)
+	dist := filepath.Join("bin", "dist", *version)
 	must(os.RemoveAll(dist))
 	must(os.MkdirAll(dist, 0o755))
 
