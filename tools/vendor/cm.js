@@ -1,12 +1,11 @@
 // CodeMirror bundle for the compose editor: YAML/.env editing, lint markers
-// fed by the server's validation, and a merge view for diffs.
+// fed by the server's validation.
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState, Compartment } from "@codemirror/state";
 import { keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { yaml } from "@codemirror/lang-yaml";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
-import { unifiedMergeView } from "@codemirror/merge";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 
@@ -30,11 +29,11 @@ const theme = EditorView.theme({
   ".cm-scroller": { overflow: "auto" },
 });
 
-export function mount(parent, doc, { lang = "yaml", onChange, readOnly = false, original } = {}) {
+export function mount(parent, doc, { lang = "yaml", onChange, readOnly = false, nonce } = {}) {
   const ext = [basicSetup, theme, syntaxHighlighting(highlight), keymap.of([indentWithTab]), lintGutter(), EditorView.lineWrapping];
+  if (nonce) ext.push(EditorView.cspNonce.of(nonce));
   if (lang === "yaml") ext.push(yaml());
   if (readOnly) ext.push(EditorState.readOnly.of(true), EditorView.editable.of(false));
-  if (original !== undefined) ext.push(unifiedMergeView({ original, mergeControls: false, gutter: true }));
   if (onChange) ext.push(EditorView.updateListener.of((u) => { if (u.docChanged) onChange(u.state.doc.toString()); }));
   const view = new EditorView({ parent, state: EditorState.create({ doc, extensions: ext }) });
   return {

@@ -1,12 +1,9 @@
 # dockerr — multi-arch image. CGO_ENABLED=0 (pure-Go SQLite): cross-compiles natively.
 
 # Digest-pinned: the tag alone follows Alpine releases.
-FROM --platform=$BUILDPLATFORM golang:1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine@sha256:b8c9b82affbbb82a020bbcf998dad2ba9516944ac7e883524642a481a9505e9c AS build
 ARG TARGETOS TARGETARCH VERSION=dev REVISION=
 WORKDIR /src
-# go.mod may ask for a newer patch toolchain (a security release) before its
-# image is published; the official image pins GOTOOLCHAIN=local otherwise.
-ENV GOTOOLCHAIN=auto
 
 COPY go.mod go.sum ./
 RUN go mod download
@@ -23,7 +20,7 @@ RUN V="$VERSION"; [ "$V" = dev ] && [ -n "$REVISION" ] && V="dev-$(echo "$REVISI
     && mkdir -p /out/data
 
 # distroless/static: CA bundle for registry checks, no shell, no package manager.
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:d62067879de890a1def9da0e7766b7d20810a5e5555cef8506b752437d7a3e88
 COPY --from=build /out/dockerr /dockerr
 COPY --from=build --chown=nonroot:nonroot /out/data /data
 ENV DOCKERR_LISTEN=:8080 \
