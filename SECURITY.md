@@ -46,8 +46,12 @@ never be the only thing standing in front of the Docker API.
 - **Secrets in the UI**: environment variables are blurred until clicked; the
   history keeps every saved compose and `.env`, so treat the data volume as
   sensitive.
-- **Headers**: a strict Content-Security-Policy (no inline script, no
-  third-party origin), `X-Frame-Options: DENY`, `nosniff`.
+- **Headers**: a strict Content-Security-Policy: scripts from `'self'` only,
+  no third-party origin, `object-src 'none'`, and inline `<style>` only with a
+  per-response nonce (the editor uses it). The terminal page is the one
+  exception: xterm.js cannot carry a nonce, so it allows inline styles there,
+  never inline scripts. Plus `Permissions-Policy` (no camera, microphone or
+  geolocation), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`.
 
 ## Container hardening
 

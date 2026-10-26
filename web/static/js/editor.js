@@ -73,6 +73,7 @@ function switchFile(f) {
   for (const b of root.querySelectorAll("[data-file]")) b.setAttribute("aria-selected", b.dataset.file === f);
   if (ed) ed.destroy();
   ed = mount($("#editor"), cur[f], {
+    nonce: document.querySelector('meta[name="csp-nonce"]')?.content,
     lang: f === "compose" ? "yaml" : "env",
     readOnly: !editable,
     onChange: (v) => { cur[file] = v; updateButtons(); scheduleValidate(); },

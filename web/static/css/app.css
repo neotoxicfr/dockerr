@@ -213,6 +213,8 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 }
 .empty { padding: 48px 20px; text-align: center; color: var(--fg-2); }
 .empty .btn { margin-top: 14px; }
+.offline { padding-top: 30vh; }
+.sprite { position: absolute; }
 .error-box { padding: 12px 14px; border-radius: var(--r-s); background: var(--bad-soft); color: var(--bad); margin-bottom: 14px; }
 
 /* ---- services ---- */

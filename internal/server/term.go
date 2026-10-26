@@ -22,6 +22,7 @@ func (s *Server) terminalPage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	w.Header().Set("Content-Security-Policy", cspTerminal)
 	s.render(w, r, "terminal", c.Name, "resources", map[string]any{"C": c, "Enabled": s.execAllowed(), "ConfigOn": s.cfg.ExecEnabled})
 }
 

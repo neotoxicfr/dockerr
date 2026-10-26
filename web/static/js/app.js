@@ -176,7 +176,9 @@ function renderTasks(el, list, done) {
     if (t.Status === "working" && t.Percent) {
       const bar = document.createElement("div");
       bar.className = "bar-p";
-      bar.innerHTML = `<i style="width:${t.Percent}%"></i>`;
+      const fill = document.createElement("i");
+      fill.style.width = `${t.Percent}%`;
+      bar.append(fill);
       row.append(bar);
     }
     if (t.Details && t.Status === "error") {

@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -133,14 +135,37 @@ func (s *Server) Handler() http.Handler {
 	return securityHeaders(a.Middleware(mux, open))
 }
 
+const cspRest = "object-src 'none'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+
+// csp allows <style> elements carrying the request's nonce: CodeMirror
+// injects its styles that way. Scripts stay 'self' only.
+func csp(nonce string) string {
+	return "default-src 'self'; img-src 'self' data:; style-src 'self' 'nonce-" + nonce + "'; " + cspRest
+}
+
+// cspTerminal: xterm.js injects <style> elements and cannot carry a nonce,
+// so the terminal page alone allows inline styles (never inline scripts).
+const cspTerminal = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; " + cspRest
+
+type nonceKey struct{}
+
+func nonce(r *http.Request) string {
+	n, _ := r.Context().Value(nonceKey{}).(string)
+	return n
+}
+
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "same-origin")
 		h.Set("X-Frame-Options", "DENY")
-		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
-		next.ServeHTTP(w, r)
+		b := make([]byte, 16)
+		_, _ = rand.Read(b)
+		n := base64.RawURLEncoding.EncodeToString(b)
+		h.Set("Content-Security-Policy", csp(n))
+		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), nonceKey{}, n)))
 	})
 }
 
@@ -224,6 +249,7 @@ type page struct {
 	Advanced bool
 	Version  string
 	Caps     docker.Caps
+	Nonce    string // CSP nonce for injected <style> elements
 	Data     any
 }
 
@@ -233,7 +259,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name, title, nav
 		http.Error(w, "page inconnue", http.StatusInternalServerError)
 		return
 	}
-	p := page{Title: title, Nav: nav, User: auth.User(r.Context()), Advanced: s.advanced(r), Version: Version, Caps: s.docker.Caps, Data: data}
+	p := page{Title: title, Nav: nav, User: auth.User(r.Context()), Advanced: s.advanced(r), Version: Version, Caps: s.docker.Caps, Nonce: nonce(r), Data: data}
 	var b bytes.Buffer
 	if err := t.ExecuteTemplate(&b, "layout", p); err != nil {
 		slog.Error("render", "page", name, "err", err)
