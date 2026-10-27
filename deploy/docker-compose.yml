@@ -66,7 +66,9 @@ services:
       traefik.http.middlewares.dockerr-noid.headers.customrequestheaders.Remote-Groups: ""
       traefik.http.middlewares.dockerr-noid.headers.customrequestheaders.Remote-Name: ""
       traefik.http.middlewares.dockerr-noid.headers.customrequestheaders.Remote-Email: ""
-      traefik.http.routers.dockerr.middlewares: dockerr-noid, authelia@file
+      # The chain must not set its own Content-Security-Policy or
+      # X-Frame-Options: it would replace the stricter ones dockerr sends.
+      traefik.http.routers.dockerr.middlewares: dockerr-noid, admin-chain-app@file
       traefik.http.services.dockerr.loadbalancer.server.port: "8080"
     security_opt:
       - no-new-privileges:true
