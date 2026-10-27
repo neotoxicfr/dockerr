@@ -61,3 +61,40 @@ func TestSecretReadWrite(t *testing.T) {
 		t.Error("ValidSecretName")
 	}
 }
+
+func TestWriteRefusesLink(t *testing.T) {
+	dir := t.TempDir()
+	me := os.Getuid()
+	if err := os.MkdirAll(filepath.Join(dir, "secrets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// A link put in place of the file is refused, not followed.
+	outside := filepath.Join(t.TempDir(), "victim")
+	if err := os.WriteFile(outside, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(dir, "secrets", "db")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeAtomicMode(filepath.Join(dir, "secrets", "db"), []byte("x"), 0o600, me); err == nil {
+		t.Error("wrote through a symbolic link")
+	}
+	if b, _ := os.ReadFile(outside); string(b) != "keep" {
+		t.Fatalf("link target changed: %q", b)
+	}
+}
+
+func TestOwnerChangeAlone(t *testing.T) {
+	dir := t.TempDir()
+	me := os.Getuid()
+	if err := WriteSecret(dir, "s", "v", -1); err != nil {
+		t.Fatal(err)
+	}
+	// Same value, owner given: the write must still happen (no early return).
+	if err := WriteSecret(dir, "s", "v", me); err != nil {
+		t.Fatal(err)
+	}
+	if SecretOwner(dir, "s") != me {
+		t.Fatal("owner not applied")
+	}
+}

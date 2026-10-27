@@ -78,13 +78,7 @@ func WriteSecret(dir, file, value string, uid int) error {
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return err
 	}
-	if err := writeAtomicMode(p, []byte(value), 0o600); err != nil {
-		return err
-	}
-	if uid >= 0 {
-		return os.Chown(p, uid, uid)
-	}
-	return nil
+	return writeAtomicMode(p, []byte(value), 0o600, uid)
 }
 
 // SecretOwner returns the uid owning a secret file, -1 when it does not exist.

@@ -147,41 +147,51 @@ func (st *Stack) WriteFiles(composeText, envText string) error {
 
 // writeAtomic writes through a temporary file and a rename, keeping the
 // original mode and, when allowed, its owner.
-func writeAtomic(path string, data []byte) error { return writeAtomicMode(path, data, 0o644) }
+func writeAtomic(path string, data []byte) error { return writeAtomicMode(path, data, 0o644, -1) }
 
 // writeAtomicMode uses mode for a new file; an existing file keeps its own.
-func writeAtomicMode(path string, data []byte, mode os.FileMode) error {
+// owner >= 0 sets the file's uid and gid, otherwise an existing file keeps
+// its owner. Mode and owner are set on the open temporary file, before the
+// rename: never through a path someone else could swap for a link.
+func writeAtomicMode(path string, data []byte, mode os.FileMode, owner int) error {
 	var uid, gid = -1, -1
-	if st, err := os.Stat(path); err == nil {
+	if st, err := os.Lstat(path); err == nil {
+		if !st.Mode().IsRegular() {
+			return fmt.Errorf("%s n'est pas un fichier ordinaire", filepath.Base(path))
+		}
 		mode = st.Mode().Perm()
 		if sys, ok := st.Sys().(*syscall.Stat_t); ok {
 			uid, gid = int(sys.Uid), int(sys.Gid)
 		}
-		if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, data) {
+		if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, data) && (owner < 0 || owner == uid) {
 			return nil
 		}
+	}
+	if owner >= 0 {
+		uid, gid = owner, owner
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".dockerr-*")
 	if err != nil {
 		return err
 	}
 	defer func() { _ = os.Remove(tmp.Name()) }()
+	fail := func(err error) error { tmp.Close(); return err }
+	if err := tmp.Chmod(mode); err != nil {
+		return fail(err)
+	}
+	if uid >= 0 {
+		if err := tmp.Chown(uid, gid); err != nil && owner >= 0 {
+			return fail(err) // asked for: must not silently keep root
+		}
+	}
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return err
+		return fail(err)
 	}
 	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		return err
+		return fail(err)
 	}
 	if err := tmp.Close(); err != nil {
 		return err
-	}
-	if err := os.Chmod(tmp.Name(), mode); err != nil {
-		return err
-	}
-	if uid >= 0 {
-		_ = os.Chown(tmp.Name(), uid, gid)
 	}
 	return os.Rename(tmp.Name(), path)
 }
