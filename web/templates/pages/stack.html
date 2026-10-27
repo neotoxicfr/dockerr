@@ -5,29 +5,10 @@
 {{end}}
 
 {{define "compose-tab"}}{{$st := .Data.Stack}}
-<div id="compose-editor" data-stack="{{$st.Name}}" data-editable="{{if $st.Managed}}1{{end}}" data-compose-ok="{{if .Caps.Compose}}1{{end}}">
-  <div class="editor-bar">
-    <div class="seg" role="tablist">
-      <button role="tab" aria-selected="true" data-file="compose">{{if $st.File}}{{base $st.File}}{{else}}compose.yaml{{end}}</button>
-      <button role="tab" data-file="env">.env</button>
-    </div>
-    <div class="status" id="ed-status" aria-live="polite"></div>
-    {{if $st.Managed}}
-    <div class="actions">
-      <button class="btn" id="ed-reset" disabled>Annuler</button>
-      <button class="btn" id="ed-save" disabled>Enregistrer</button>
-      <button class="btn primary" id="ed-apply" disabled>Enregistrer et appliquer</button>
-    </div>
-    {{else}}<span class="pill">Lecture seule</span>{{end}}
-  </div>
-  <div class="editor" id="editor"></div>
+<div id="compose-editor" data-stack="{{$st.Name}}" data-editable="{{if $st.Managed}}1{{end}}" data-compose-ok="{{if .Caps.Compose}}1{{end}}" data-mode="{{.Data.EditorMode}}">
+  {{template "editor-chrome" dict "Editable" $st.Managed "New" false}}
 </div>
-<dialog id="diff-dialog" class="wide">
-  <form method="dialog">
-    <div class="dlg-body"><h2>Modifications</h2><div id="diff-body"></div></div>
-    <div class="dlg-foot"><button class="btn" value="no">Annuler</button><button class="btn primary" value="yes" id="diff-ok">Enregistrer</button></div>
-  </form>
-</dialog>
+{{template "diff-dialog"}}
 <script type="module" src="/static/js/editor.js?v={{.Version}}"></script>
 {{end}}
 

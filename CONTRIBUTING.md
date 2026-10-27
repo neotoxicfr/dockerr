@@ -20,11 +20,12 @@ make dev    # local socket, no auth, http://127.0.0.1:8080
 cmd/dockerr          entry point, wiring
 internal/config      environment variables
 internal/docker      API client, capability probe, stats, events
-internal/stacks      stack discovery, state, compose files, validation
+internal/stacks      stack discovery, state, compose files, checks, secret files
+internal/composeedit compose model for the forms, targeted YAML edits
 internal/ops         compose operations and their live progress
 internal/netdeps     network_mode container:/service: graph and repair
 internal/updates     registry digest checks
-internal/server      HTTP handlers, templates helpers
+internal/server      HTTP handlers, templates helpers, network map
 internal/store       SQLite: history, preferences, terminal log
 web/templates        html/template pages and partials
 web/static           CSS, JS, icons, service worker, vendored bundles

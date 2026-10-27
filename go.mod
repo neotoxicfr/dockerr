@@ -13,6 +13,7 @@ require (
 	github.com/moby/moby/api v1.56.1
 	github.com/moby/moby/client v0.6.2
 	github.com/pressly/goose/v3 v3.29.0
+	github.com/sirupsen/logrus v1.10.2
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/sync v0.24.0
 	modernc.org/sqlite v1.60.1
@@ -89,7 +90,6 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.11.0 // indirect
 	github.com/sethvargo/go-retry v0.5.0 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
-	github.com/sirupsen/logrus v1.10.2 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect

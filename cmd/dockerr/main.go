@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/neotoxicfr/dockerr/internal/config"
 	"github.com/neotoxicfr/dockerr/internal/docker"
 	"github.com/neotoxicfr/dockerr/internal/ops"
@@ -36,6 +38,9 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	// compose-go logs a warning per unset variable on every load; the editor
+	// reports them itself.
+	logrus.SetLevel(logrus.ErrorLevel)
 	if cfg.InsecureNoAuth {
 		slog.Warn("DOCKERR_INSECURE_NOAUTH=1: no authentication, bench use only")
 	}

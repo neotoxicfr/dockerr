@@ -110,6 +110,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /s/{name}/history", s.stackHistory)
 	mux.HandleFunc("GET /s/{name}/history/{id}", s.stackVersion)
 	mux.HandleFunc("POST /s/{name}/history/{id}/restore", s.stackRestore)
+	mux.HandleFunc("POST /compose/check", s.composeCheck)
+	mux.HandleFunc("GET /s/{name}/secrets/{secret}", s.secretReveal)
+	mux.HandleFunc("POST /s/{name}/secrets", s.secretSave)
 	mux.HandleFunc("GET /ops/{id}", s.opStream)
 	mux.HandleFunc("GET /events", s.eventStream)
 	mux.HandleFunc("POST /updates/check", s.checkUpdates)
@@ -117,6 +120,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /resources", s.resources)
 	mux.HandleFunc("GET /c/{id}", s.containerPage)
 	mux.HandleFunc("POST /c/{id}/action", s.containerAction)
+	mux.HandleFunc("GET /c/{id}/env", s.containerEnv)
 	mux.HandleFunc("POST /resources/prune", s.prune)
 	mux.HandleFunc("POST /images/{id}/remove", s.imageRemove)
 	mux.HandleFunc("GET /network", s.networkPage)
@@ -125,6 +129,7 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /settings", s.settings)
 	mux.HandleFunc("POST /settings/mode", s.setMode)
+	mux.HandleFunc("POST /prefs", s.setPref)
 
 	a := &auth.Auth{Header: s.cfg.AuthHeader, Trusted: s.cfg.TrustedProxies, Hosts: s.cfg.TrustedHosts, Insecure: s.cfg.InsecureNoAuth,
 		Group: s.cfg.RequireGroup, GroupsHeader: s.cfg.GroupsHeader}

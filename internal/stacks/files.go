@@ -51,16 +51,23 @@ var (
 // Validate loads compose and env contents the way `docker compose` would,
 // without touching the files on disk.
 func Validate(ctx context.Context, name, dir, composeText, envText string) []Issue {
+	_, _, issues := load(ctx, name, dir, composeText, envText)
+	return issues
+}
+
+// load parses compose and .env contents the way compose does, without paths
+// resolution, and returns the project with the .env variables.
+func load(ctx context.Context, name, dir, composeText, envText string) (*types.Project, map[string]string, []Issue) {
 	env := map[string]string{}
 	if strings.TrimSpace(envText) != "" {
 		e, err := dotenv.UnmarshalBytesWithLookup([]byte(envText), nil)
 		if err != nil {
-			return []Issue{{Message: ".env : " + err.Error()}}
+			return nil, nil, []Issue{{Message: ".env : " + err.Error()}}
 		}
 		env = e
 	}
 	file := filepath.Join(dir, "compose.yaml")
-	_, err := loader.LoadWithContext(ctx, types.ConfigDetails{
+	p, err := loader.LoadWithContext(ctx, types.ConfigDetails{
 		WorkingDir:  dir,
 		ConfigFiles: []types.ConfigFile{{Filename: file, Content: []byte(composeText)}},
 		Environment: env,
@@ -69,26 +76,26 @@ func Validate(ctx context.Context, name, dir, composeText, envText string) []Iss
 		o.ResolvePaths = false
 	})
 	if err == nil {
-		return nil
+		return p, env, nil
 	}
 	msg := strings.TrimPrefix(err.Error(), "validating "+file+": ")
 	msg = strings.ReplaceAll(msg, file+": ", "")
-	p := Issue{Message: msg}
+	is := Issue{Message: msg}
 	if m := lineRe.FindStringSubmatch(msg); m != nil {
 		for _, g := range []string{m[3], m[2], m[1]} {
 			if g != "" {
-				p.Line, _ = strconv.Atoi(g)
+				is.Line, _ = strconv.Atoi(g)
 				break
 			}
 		}
 		// "failed to parse … at L2.C3-L4.C4: did not find expected key"
 		if i := strings.LastIndex(msg, ": "); i >= 0 {
-			p.Message = msg[i+2:]
+			is.Message = msg[i+2:]
 		}
 	} else if m := pathRe.FindStringSubmatch(msg); m != nil {
-		p.Line = lineOf(composeText, strings.Split(m[1], "."))
+		is.Line = lineOf(composeText, strings.Split(m[1], "."))
 	}
-	return []Issue{p}
+	return nil, env, []Issue{is}
 }
 
 // lineOf returns the line of the deepest YAML node found along path.
@@ -140,8 +147,10 @@ func (st *Stack) WriteFiles(composeText, envText string) error {
 
 // writeAtomic writes through a temporary file and a rename, keeping the
 // original mode and, when allowed, its owner.
-func writeAtomic(path string, data []byte) error {
-	mode := os.FileMode(0o644)
+func writeAtomic(path string, data []byte) error { return writeAtomicMode(path, data, 0o644) }
+
+// writeAtomicMode uses mode for a new file; an existing file keeps its own.
+func writeAtomicMode(path string, data []byte, mode os.FileMode) error {
 	var uid, gid = -1, -1
 	if st, err := os.Stat(path); err == nil {
 		mode = st.Mode().Perm()

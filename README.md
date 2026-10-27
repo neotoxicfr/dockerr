@@ -36,8 +36,20 @@ another container's network**, like apps routed through a VPN container.
   updates. Problems sort first; search with <kbd>/</kbd>.
 - **One-tap operations** on a stack or a single service: start, stop, restart,
   update (pull + up), recreate, with live progress.
-- **Compose editor**: YAML and `.env`, checked as you type with the faulty line
-  marked, a diff before saving, then *save and apply*.
+- **Graphical or text editing**, on the same file: forms per service (image,
+  ports, volumes, variables, networks, secrets…) or a YAML editor, switched with
+  one click. Form edits rewrite only what changed and keep your comments.
+- **A visible check after every change**: once you stop typing, dockerr loads
+  the file the way compose does and tells you whether the stack will start —
+  syntax errors with their line, undefined variables, missing external
+  networks or volumes, ports already taken, missing secret or bind files.
+- **Secrets**: create, edit and attach file secrets to services; values are
+  masked until you click, written `0600` in the stack folder, mounted under
+  `/run/secrets`. Not every image reads them, and a container that does not run
+  as root needs `uid`/`mode` in the service's long syntax: dockerr says so where
+  you add one.
+- A diff before saving, then *save and apply*; sensitive `.env` values stay
+  masked, in the editor and in the diff.
 - **Update checks** straight against the registries with `HEAD` requests: no
   Docker Hub pull quota spent, private registries through the usual
   `config.json`. A pulled image that a container does not run yet counts too.
@@ -65,9 +77,13 @@ shows who rides on whom.
 
 ### Advanced mode
 
-- Containers outside compose, images, networks, volumes, with cleanup.
+- Containers outside compose, images, networks (subnets, gateways, every
+  container's IPv4, IPv6 and MAC), volumes, with cleanup.
+- **Network map**: networks as buses, every container once with a dot on each
+  network it joins and its address, containers sharing another one's network
+  drawn under it.
 - Container details: command, restart policy, IPs, ports, mounts, variables
-  (blurred until clicked), labels, raw inspect.
+  (sensitive ones fetched only when clicked), labels, raw inspect.
 - History of every saved compose and `.env`, with diff and one-click restore.
 - Container terminal, off by default, every session logged.
 

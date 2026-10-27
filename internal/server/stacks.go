@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -137,6 +139,8 @@ type stackData struct {
 	Children  map[string][]*stacks.Container // parent container ID → children
 	Versions  []store.Version
 	Version   *versionView
+	// EditorMode is the compose editor's last mode for this user: visual or text.
+	EditorMode string
 }
 
 func (s *Server) loadStack(w http.ResponseWriter, r *http.Request) (*stacks.Stack, []*stacks.Container, bool) {
@@ -172,12 +176,35 @@ func (s *Server) stackData(r *http.Request, st *stacks.Stack, all []*stacks.Cont
 	return d
 }
 
+func (s *Server) editorMode(r *http.Request) string {
+	if s.store.Pref(r.Context(), auth.User(r.Context()), "editor_mode") == "text" {
+		return "text"
+	}
+	return "visual"
+}
+
+// setPref stores a per-user display preference from an allowed list.
+func (s *Server) setPref(w http.ResponseWriter, r *http.Request) {
+	allowed := map[string][]string{"editor_mode": {"visual", "text"}}
+	k, v := r.FormValue("key"), r.FormValue("value")
+	if !slices.Contains(allowed[k], v) {
+		jsonError(w, http.StatusBadRequest, "préférence inconnue")
+		return
+	}
+	if err := s.store.SetPref(r.Context(), auth.User(r.Context()), k, v); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 func (s *Server) stackPage(w http.ResponseWriter, r *http.Request) {
 	st, all, ok := s.loadStack(w, r)
 	if !ok {
 		return
 	}
 	d := s.stackData(r, st, all)
+	d.EditorMode = s.editorMode(r)
 	if d.Tab == "history" {
 		d.Versions, _ = s.store.Versions(r.Context(), st.Name)
 	}
@@ -291,6 +318,15 @@ type filesBody struct {
 	Compose string `json:"compose"`
 	Env     string `json:"env"`
 	Apply   bool   `json:"apply"`
+	// Base is the hash of the files the edit started from: a save refuses
+	// to overwrite files changed on disk since.
+	Base string `json:"base"`
+}
+
+// filesHash identifies a compose + .env pair.
+func filesHash(compose, env string) string {
+	h := sha256.Sum256([]byte(compose + "\x00" + env))
+	return hex.EncodeToString(h[:8])
 }
 
 func readBody(w http.ResponseWriter, r *http.Request) (filesBody, bool) {
@@ -313,7 +349,7 @@ func (s *Server) stackFiles(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"compose": c, "env": e, "file": st.File, "editable": st.Managed})
+	writeJSON(w, http.StatusOK, map[string]any{"compose": c, "env": e, "file": st.File, "editable": st.Managed, "hash": filesHash(c, e)})
 }
 
 func (s *Server) stackValidate(w http.ResponseWriter, r *http.Request) {
@@ -374,6 +410,13 @@ func (s *Server) stackSave(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"issues": issues})
 		return
 	}
+	if b.Base != "" {
+		c, e, err := st.ReadFiles()
+		if err == nil && filesHash(c, e) != b.Base {
+			jsonError(w, http.StatusConflict, "le fichier a changé sur le disque depuis l'ouverture : recharge avant d'enregistrer")
+			return
+		}
+	}
 	user := auth.User(r.Context())
 	if err := s.saveFiles(r.Context(), st, b.Compose, b.Env, user, ""); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
@@ -392,6 +435,7 @@ func (s *Server) stackSave(w http.ResponseWriter, r *http.Request) {
 		}
 		res["id"] = op.ID
 	}
+	res["hash"] = filesHash(b.Compose, b.Env)
 	writeJSON(w, http.StatusOK, res)
 }
 
@@ -493,7 +537,7 @@ func (s *Server) stackRestore(w http.ResponseWriter, r *http.Request) {
 // --- new stack ---
 
 func (s *Server) newStack(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, "new", "Nouvelle pile", "stacks", nil)
+	s.render(w, r, "new", "Nouvelle pile", "stacks", s.editorMode(r))
 }
 
 func (s *Server) validateNew(w http.ResponseWriter, r *http.Request) {

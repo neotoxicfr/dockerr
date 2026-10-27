@@ -1,0 +1,38 @@
+{{define "editor-chrome"}}
+<div class="editor-bar">
+  <div class="seg" role="group" aria-label="Mode d'édition">
+    <button type="button" data-mode="visual" aria-pressed="false"><svg class="i s"><use href="#i-form"/></svg>Graphique</button>
+    <button type="button" data-mode="text" aria-pressed="false"><svg class="i s"><use href="#i-code"/></svg>Texte</button>
+  </div>
+  <div class="seg" role="tablist" aria-label="Partie" id="ed-parts">
+    <button type="button" role="tab" data-part="compose" aria-selected="true"><svg class="i s"><use href="#i-cube"/></svg>Services</button>
+    <button type="button" role="tab" data-part="env" aria-selected="false"><svg class="i s"><use href="#i-env"/></svg>.env</button>
+    {{if not .New}}<button type="button" role="tab" data-part="secrets" aria-selected="false"><svg class="i s"><use href="#i-key"/></svg>Secrets</button>{{end}}
+  </div>
+  <span class="grow"></span>
+  {{if .Editable}}<div class="actions">
+    {{if .New}}
+    <button class="btn" id="ns-create">Créer</button>
+    <button class="btn primary" id="ns-start">Créer et démarrer</button>
+    {{else}}
+    <button class="btn ghost" id="ed-reset" disabled>Annuler</button>
+    <button class="btn" id="ed-save" disabled>Enregistrer</button>
+    <button class="btn primary" id="ed-apply" disabled>Appliquer</button>
+    {{end}}
+  </div>{{else}}<span class="pill"><svg class="i s"><use href="#i-lock"/></svg>Lecture seule</span>{{end}}
+</div>
+<div class="check" id="ed-check" role="status" aria-live="polite"><svg class="i"><use href="#i-loader"/></svg><span class="msg">Vérification…</span>
+  <button type="button" class="btn ghost sm" id="ed-check-more" hidden>Détails</button></div>
+<div class="check-list" id="ed-check-list" hidden></div>
+<div id="visual" class="visual" hidden></div>
+<div class="editor" id="editor" hidden></div>
+{{end}}
+
+{{define "diff-dialog"}}
+<dialog id="diff-dialog" class="wide">
+  <form method="dialog">
+    <div class="dlg-body"><h2>Modifications</h2><div id="diff-body"></div></div>
+    <div class="dlg-foot"><button class="btn" value="no">Annuler</button><button class="btn primary" value="yes" id="diff-ok">Enregistrer</button></div>
+  </form>
+</dialog>
+{{end}}

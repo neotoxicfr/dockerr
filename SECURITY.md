@@ -43,8 +43,12 @@ never be the only thing standing in front of the Docker API.
 - **Terminal off by default**: it needs `DOCKERR_EXEC=1` *and* `EXEC=1` on the
   proxy. Every session is logged (user, container, start, end).
 - **Self-protection**: dockerr refuses to operate the stack it runs in.
-- **Secrets in the UI**: environment variables are blurred until clicked; the
-  history keeps every saved compose and `.env`, so treat the data volume as
+- **Secrets**: compose file secrets are written `0600` inside the stack
+  folder only (paths leading out of it, symbolic links included, are refused).
+  Their values never reach the page until the user clicks *Afficher*, and every
+  reveal is logged. Sensitive-looking variables (password, token, key…) are
+  masked in forms and diffs, and a container's are fetched only on click.
+  The history keeps every saved compose and `.env`, so treat the data volume as
   sensitive.
 - **Headers**: a strict Content-Security-Policy: scripts from `'self'` only,
   no third-party origin, `object-src 'none'`, and inline `<style>` only with a
