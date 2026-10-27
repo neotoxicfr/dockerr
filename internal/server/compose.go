@@ -66,6 +66,8 @@ type checkResult struct {
 	Issues   []stacks.Issue     `json:"issues"`
 	Warnings []stacks.Issue     `json:"warnings"`
 	EditErr  string             `json:"edit_error,omitempty"`
+	// Owners maps a stack's file secrets to the uid owning their file.
+	Owners map[string]int `json:"owners,omitempty"`
 }
 
 // composeCheck applies graphical edits (if any) to the compose text, then
@@ -109,6 +111,14 @@ func (s *Server) composeCheck(w http.ResponseWriter, r *http.Request) {
 	if perr == nil {
 		m := doc.Model()
 		res.Model = &m
+		if b.Stack != "" {
+			res.Owners = map[string]int{}
+			for _, sec := range m.Secrets {
+				if sec.File != "" {
+					res.Owners[sec.Name] = stacks.SecretOwner(dir, sec.File)
+				}
+			}
+		}
 	}
 	rep := stacks.Check(r.Context(), name, dir, res.Compose, b.Env, s.host(r.Context(), all))
 	res.Issues, res.Warnings = rep.Issues, rep.Warnings
@@ -153,7 +163,7 @@ func (s *Server) secretReveal(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Info("secret revealed", "user", auth.User(r.Context()), "stack", st.Name, "secret", name)
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, map[string]string{"value": v})
+	writeJSON(w, http.StatusOK, map[string]any{"value": v, "uid": stacks.SecretOwner(st.Dir, file)})
 }
 
 type secretBody struct {
@@ -161,6 +171,7 @@ type secretBody struct {
 	Value    *string  `json:"value"` // nil: keep the current value
 	Services []string `json:"services"`
 	Remove   bool     `json:"remove"`
+	UID      *int     `json:"uid"` // owner of the file; nil keeps it
 	Base     string   `json:"base"`
 }
 
@@ -246,8 +257,22 @@ func (s *Server) secretSave(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-	case b.Value != nil:
-		if err := stacks.WriteSecret(st.Dir, file, *b.Value); err != nil {
+	case b.Value != nil || b.UID != nil:
+		uid := -1
+		if b.UID != nil {
+			if *b.UID < 0 || *b.UID > 65535 {
+				jsonError(w, http.StatusBadRequest, "UID invalide : 0 à 65535")
+				return
+			}
+			uid = *b.UID
+		}
+		v := ""
+		if b.Value != nil {
+			v = *b.Value
+		} else if cur, err := stacks.ReadSecret(st.Dir, file); err == nil {
+			v = cur
+		}
+		if err := stacks.WriteSecret(st.Dir, file, v, uid); err != nil {
 			jsonError(w, http.StatusInternalServerError, err.Error())
 			return
 		}

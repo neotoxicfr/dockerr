@@ -45,9 +45,10 @@ another container's network**, like apps routed through a VPN container.
   networks or volumes, ports already taken, missing secret or bind files.
 - **Secrets**: create, edit and attach file secrets to services; values are
   masked until you click, written `0600` in the stack folder, mounted under
-  `/run/secrets`. Not every image reads them, and a container that does not run
-  as root needs `uid`/`mode` in the service's long syntax: dockerr says so where
-  you add one.
+  `/run/secrets`. Compose mounts file secrets as they are, so a container that
+  does not run as root reads one only if it owns the file: give its UID and
+  dockerr hands the file to it. Not every image reads secrets; dockerr says so
+  where you add one.
 - A diff before saving, then *save and apply*; sensitive `.env` values stay
   masked, in the editor and in the diff.
 - **Update checks** straight against the registries with `HEAD` requests: no

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 )
 
 var secretNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`)
@@ -64,8 +65,12 @@ func ReadSecret(dir, file string) (string, error) {
 	return string(b), err
 }
 
-// WriteSecret writes a secret file readable by its owner only.
-func WriteSecret(dir, file, value string) error {
+// WriteSecret writes a secret file readable by its owner only. Compose
+// bind-mounts file secrets as they are (uid/mode in the service are ignored
+// for them), so a container not running as root reads the file only if it
+// owns it: uid >= 0 gives the file to that user (and group), -1 keeps the
+// current owner.
+func WriteSecret(dir, file, value string, uid int) error {
 	p, err := SecretPath(dir, file)
 	if err != nil {
 		return err
@@ -73,7 +78,29 @@ func WriteSecret(dir, file, value string) error {
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return err
 	}
-	return writeAtomicMode(p, []byte(value), 0o600)
+	if err := writeAtomicMode(p, []byte(value), 0o600); err != nil {
+		return err
+	}
+	if uid >= 0 {
+		return os.Chown(p, uid, uid)
+	}
+	return nil
+}
+
+// SecretOwner returns the uid owning a secret file, -1 when it does not exist.
+func SecretOwner(dir, file string) int {
+	p, err := SecretPath(dir, file)
+	if err != nil {
+		return -1
+	}
+	st, err := os.Stat(p)
+	if err != nil {
+		return -1
+	}
+	if sys, ok := st.Sys().(*syscall.Stat_t); ok {
+		return int(sys.Uid)
+	}
+	return -1
 }
 
 // RemoveSecret deletes a secret file; a missing file is not an error.

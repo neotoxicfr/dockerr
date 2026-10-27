@@ -96,6 +96,7 @@ async function runCheck(edits) {
   // A text change made while this check ran: a newer check is scheduled.
   if (!edited && body.compose !== st.compose) return;
   st.model = r.body.model;
+  st.owners = r.body.owners || {};
   st.issues = r.body.issues || [];
   st.warnings = r.body.warnings || [];
   renderCheck();
@@ -436,8 +437,7 @@ function secretsPanel() {
     h("b", {}, "Toutes les images ne savent pas lire un secret. "),
     "Il est monté en fichier dans ", h("code", {}, "/run/secrets/<nom>"),
     " : l'image doit lire ce chemin, souvent via une variable qui finit par ", h("code", {}, "_FILE"),
-    ". Le fichier est créé en 0600 : si le conteneur ne tourne pas en root, donne-lui son ",
-    h("code", {}, "uid"), " et un ", h("code", {}, "mode"), " dans la syntaxe longue du service (mode texte). ",
+    ". Le fichier est en 0600, seul son propriétaire le lit : si le conteneur ne tourne pas en root, indique son UID. ",
     "Les valeurs restent masquées tant que tu ne cliques pas sur Afficher."))];
   if (isNew) return out.concat(h("p", { class: "faint" }, "Crée d'abord la pile pour lui ajouter des secrets."));
   if (!st.model) return out.concat(h("p", { class: "faint" }, "Le fichier ne se lit pas : corrige-le en mode texte."));
@@ -467,15 +467,16 @@ function secretRow(sec) {
     const b = await r.json().catch(() => ({}));
     if (!r.ok) return toast(b.error || "Lecture impossible", true);
     const input = h("input", { type: "text", value: b.value, class: "mono", "aria-label": `Valeur de ${sec.name}`, autocomplete: "off", spellcheck: "false", readonly: !editable || dirty() });
-    val.replaceChildren(input,
-      editable && !dirty() ? h("button", { type: "button", class: "btn sm", onclick: () => saveSecret(sec.name, input.value, users) }, "Enregistrer") : null,
+    const uid = uidInput(b.uid);
+    val.replaceChildren(input, editable && !dirty() ? uid : null,
+      editable && !dirty() ? h("button", { type: "button", class: "btn sm", onclick: () => saveSecret(sec.name, input.value, users, false, uidValue(uid)) }, "Enregistrer") : null,
       h("button", { type: "button", class: "btn ghost sm icon", "aria-label": "Masquer", title: "Masquer", onclick: masked }, icon("eye-off")));
     input.focus();
   };
   masked();
   return h("div", { class: "secret-row" },
     h("div", { class: "secret-name" }, h("strong", {}, icon("key"), sec.name),
-      h("span", { class: "faint small" }, sec.file || (sec.external ? "externe" : sec.environment ? `variable ${sec.environment}` : "")),
+      h("span", { class: "faint small" }, sec.file ? `${sec.file} · ${ownerLabel(st.owners[sec.name])}` : (sec.external ? "externe" : sec.environment ? `variable ${sec.environment}` : "")),
       h("div", { class: "secret-users" }, users.length ? users.map((u) => h("span", { class: "chip" }, u)) : h("span", { class: "faint small" }, "aucun service"))),
     val,
     editable && !dirty() && sec.file ? h("button", { type: "button", class: "btn ghost sm icon", "aria-label": `Supprimer ${sec.name}`, title: "Supprimer",
@@ -485,27 +486,42 @@ function secretRow(sec) {
       } }, icon("trash")) : h("span"));
 }
 
+const ownerLabel = (uid) => uid === undefined || uid < 0 ? "fichier absent" : uid === 0 ? "lisible par root" : `lisible par l'UID ${uid}`;
+
+function uidInput(uid) {
+  return h("input", { type: "text", inputmode: "numeric", class: "mono uid", value: uid > 0 ? String(uid) : "", placeholder: "UID 0", "aria-label": "UID qui lit le secret (vide : root)", title: "UID du conteneur qui lit le secret (vide : root)" });
+}
+const uidValue = (el) => (el.value.trim() === "" ? 0 : Number(el.value.trim()));
+
 function newSecretCard() {
   const name = h("input", { type: "text", placeholder: "db_password", "aria-label": "Nom du secret", class: "mono", autocapitalize: "off", spellcheck: "false" });
   const value = h("input", { type: "password", placeholder: "valeur", "aria-label": "Valeur du secret", class: "mono", autocomplete: "new-password" });
   const svc = checks(st.model.services.map((s) => s.name), [], false, () => {});
+  const uid = uidInput(0);
   const add = () => {
     const n = name.value.trim();
     if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(n)) return toast("Nom : lettres, chiffres, . _ -", true);
     if (st.model.secrets.some((x) => x.name === n)) return toast("Ce secret existe déjà", true);
-    saveSecret(n, value.value, $$("input:checked", svc).map((x) => x.dataset.name));
+    const u = uidValue(uid);
+    if (!Number.isInteger(u) || u < 0 || u > 65535) return toast("UID : un nombre de 0 à 65535", true);
+    saveSecret(n, value.value, $$("input:checked", svc).map((x) => x.dataset.name), false, u);
   };
   return h("section", { class: "card vsvc" },
     h("div", { class: "vsvc-head" }, h("h3", {}, icon("plus"), "Nouveau secret")),
     h("div", { class: "vgrid" },
       field("Nom", "key", name), field("Valeur", "lock", value),
+      field("UID du conteneur, s'il ne tourne pas en root", "user", uid),
       field("Services qui le reçoivent", "cube", svc, true),
       h("div", { class: "vf wide" }, h("button", { type: "button", class: "btn primary vadd", onclick: add }, "Ajouter le secret"))));
 }
 
-async function saveSecret(name, value, services, remove = false) {
+async function saveSecret(name, value, services, remove = false, uid = null) {
   const body = { name, services, remove, base: st.hash };
   if (value !== null) body.value = value;
+  if (uid !== null) {
+    if (!Number.isInteger(uid) || uid < 0 || uid > 65535) return toast("UID : un nombre de 0 à 65535", true);
+    body.uid = uid;
+  }
   const r = await post(`/s/${encodeURIComponent(stack)}/secrets`, body, true);
   if (!r.ok) return toast(r.body.error || "Échec", true);
   st.compose = st.saved.compose = r.body.compose;

@@ -24,7 +24,7 @@ func TestSecretPathEscape(t *testing.T) {
 			t.Errorf("%q: err = %v, want ErrOutside", f, err)
 		}
 	}
-	if err := WriteSecret(dir, "link/x", "v"); !errors.Is(err, ErrOutside) {
+	if err := WriteSecret(dir, "link/x", "v", -1); !errors.Is(err, ErrOutside) {
 		t.Errorf("write through link: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(outside, "x")); err == nil {
@@ -37,8 +37,15 @@ func TestSecretReadWrite(t *testing.T) {
 	if v, err := ReadSecret(dir, "./secrets/db"); err != nil || v != "" {
 		t.Fatalf("missing secret: %q %v", v, err)
 	}
-	if err := WriteSecret(dir, "./secrets/db", "s3cret"); err != nil {
+	me := os.Getuid()
+	if err := WriteSecret(dir, "./secrets/db", "s3cret", me); err != nil {
 		t.Fatal(err)
+	}
+	if got := SecretOwner(dir, "secrets/db"); got != me {
+		t.Fatalf("owner %d, want %d", got, me)
+	}
+	if SecretOwner(dir, "secrets/none") != -1 || SecretOwner(dir, "../x") != -1 {
+		t.Error("owner of a missing or outside file")
 	}
 	fi, err := os.Stat(filepath.Join(dir, "secrets", "db"))
 	if err != nil || fi.Mode().Perm() != 0o600 {

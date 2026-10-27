@@ -498,6 +498,7 @@ a.chip:hover { border-color: var(--accent-line); color: var(--text); }
 .secret-val { display: flex; gap: 6px; align-items: center; min-width: 0; }
 .secret-val .mask { font-family: var(--mono); letter-spacing: 0.15em; color: var(--faint); }
 .secret-val input { min-height: 36px; }
+.secret-val input.uid { width: 92px; flex: none; }
 .secret-users { display: flex; flex-wrap: wrap; gap: 4px; }
 @media (max-width: 760px) { .secret-row { grid-template-columns: 1fr auto; } .secret-val { grid-column: 1 / -1; order: 3; } }
 
