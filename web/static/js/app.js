@@ -230,7 +230,7 @@ function applyFilter() {
       (filter === "updates" && row.dataset.upd) || st === filter;
     row.hidden = !okF || (q && !row.dataset.name.includes(q));
   }
-  for (const tr of $$("table[data-filterable] tbody tr, [data-filterable-cards] > [data-text]")) {
+  for (const tr of $$("table[data-filterable] tr[data-text], table[data-filterable] tbody[data-text]")) {
     tr.hidden = q && !tr.dataset.text.toLowerCase().includes(q);
   }
 }
@@ -317,6 +317,17 @@ if (pending) {
   sessionStorage.removeItem("dockerr-op");
   try { const p = JSON.parse(pending); follow(p.id, p.stack, p.op); } catch (e) {}
 }
+
+// Expandable table rows: the summary row toggles its detail row.
+document.addEventListener("click", (e) => {
+  const sum = e.target.closest("tr[data-toggle]");
+  if (!sum || e.target.closest("a")) return;
+  const det = document.getElementById(sum.dataset.toggle);
+  const open = det.hidden;
+  det.hidden = !open;
+  sum.classList.toggle("open", open);
+  $("[aria-expanded]", sum)?.setAttribute("aria-expanded", String(open));
+});
 
 // Network map: hovering a bus or a container highlights its links.
 const map = $("#netmap");

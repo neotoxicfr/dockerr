@@ -194,6 +194,9 @@ func (s *Server) volumeRows(ctx context.Context, all []*stacks.Container) ([]vol
 	var out []volumeRow
 	for _, v := range res.Items {
 		row := volumeRow{Name: v.Name, Driver: v.Driver, Project: v.Labels[api.ProjectLabel], Created: v.CreatedAt}
+		if t, err := time.Parse(time.RFC3339, v.CreatedAt); err == nil {
+			row.Created = t.Local().Format("02/01/2006")
+		}
 		for _, c := range all {
 			if slices.Contains(c.Volumes, v.Name) {
 				row.Users = append(row.Users, c)

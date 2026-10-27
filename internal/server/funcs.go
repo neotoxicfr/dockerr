@@ -37,6 +37,25 @@ var funcs = template.FuncMap{
 	"u64":  func(n int64) uint64 { return uint64(max(n, 0)) },
 	"add":  func(a, b int) int { return a + b },
 	"has":  func(list []string, s string) bool { return slices.Contains(list, s) },
+	// volName shortens anonymous volume names (64 hex digits).
+	"volName": func(n string) string {
+		if len(n) == 64 && strings.Trim(n, "0123456789abcdef") == "" {
+			return n[:12] + "…"
+		}
+		return n
+	},
+	// index4 picks the IPv4 subnet of a network, else its first one.
+	"index4": func(subnets []kv) *kv {
+		for i := range subnets {
+			if !strings.Contains(subnets[i].K, ":") {
+				return &subnets[i]
+			}
+		}
+		if len(subnets) > 0 {
+			return &subnets[0]
+		}
+		return nil
+	},
 	"dict": func(kv ...any) map[string]any {
 		m := map[string]any{}
 		for i := 0; i+1 < len(kv); i += 2 {

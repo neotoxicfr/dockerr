@@ -538,32 +538,38 @@ tbody tr:hover { background: var(--surface-2); }
 .section-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; flex-wrap: wrap; }
 .section-bar .grow { flex: 1; }
 
-/* Réseaux détaillés */
-.netcards { display: grid; gap: 10px; }
-.netcard > summary {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 12px; align-items: center;
-  padding: 13px 16px; cursor: pointer; list-style: none;
-}
-.netcard > summary::-webkit-details-marker { display: none; }
-.netcard > summary .chev { color: var(--faint); transition: transform var(--t); }
-.netcard[open] > summary .chev { transform: rotate(90deg); }
-.netcard[open] > summary { border-bottom: 1px solid var(--line); }
-.netcard .nname { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
-.netcard .nname span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.netcard .nsub { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.netfacts { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px 20px; padding: 14px 16px; margin: 0; }
-.netfacts div { display: grid; gap: 2px; min-width: 0; }
-.netfacts dt { color: var(--faint); font-size: 12px; overflow-wrap: anywhere; }
-.netfacts dd { margin: 0; font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
-.netcard .table-wrap { border: 0; border-top: 1px solid var(--line); border-radius: 0; background: none; backdrop-filter: none; }
-@media (max-width: 760px) { .netcard > summary { grid-template-columns: auto minmax(0, 1fr) auto; } .netcard .nsub { display: none; } }
+/* Tables sized to their content when that leaves the page too empty. */
+.table-wrap.fit, .fitbox { width: fit-content; max-width: 100%; }
+.fitbox .table-wrap { max-width: 100%; }
+.nettable td, .nettable th { white-space: nowrap; }
+.nettable .tg { width: 44px; padding: 0 0 0 8px; }
+.nettable tr.sum { cursor: pointer; }
+.nettable tr.sum .chev { transition: transform var(--t); }
+.nettable tr.sum.open .chev { transform: rotate(90deg); }
+.nettable tr.sum.open td { border-bottom: 0; }
+.nettable tbody.netrow:hover { background: var(--surface-2); }
+.nettable tbody tr:hover { background: none; }
+.nettable tr.det > td { padding: 0 16px 16px 52px; border-top: 0; }
+.netdet { display: grid; gap: 14px; justify-items: start; }
+table.inner { width: auto; border: 1px solid var(--line); border-radius: var(--r-m); border-collapse: separate; border-spacing: 0; background: var(--sunken); }
+table.inner th, table.inner td { padding: 8px 14px; }
+table.inner tr:first-child td { border-top: 1px solid var(--line); }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 0; }
+.facts div { display: grid; gap: 1px; }
+.facts dt { color: var(--faint); font-size: 12px; }
+.facts dd { margin: 0; font: 12.5px var(--mono); overflow-wrap: anywhere; }
+.opts > summary { padding: 0; font-weight: 500; font-size: 13px; color: var(--muted); }
+.opts[open] > summary { border: 0; margin-bottom: 8px; }
+.nettable tbody.netrow { border-top: 1px solid var(--line); }
+.nettable tbody.netrow:first-of-type { border-top: 0; }
 
 /* ---- Clé / valeur --------------------------------------------------------------------------- */
-.kv { display: grid; grid-template-columns: minmax(120px, 220px) 1fr; }
+.kv { display: grid; grid-template-columns: minmax(120px, 220px) minmax(0, 1fr); }
+
 .kv > div { padding: 10px 16px; border-top: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
 .kv > div:nth-child(-n+2) { border-top: 0; }
 .kv .k { color: var(--muted); }
-.panel { margin-bottom: 20px; }
+.panel { margin-bottom: 20px; max-width: 980px; }
 .panel > h2 { margin: 0 0 10px; }
 .masked { display: inline-flex; align-items: center; gap: 8px; }
 .masked .dots { letter-spacing: 0.15em; color: var(--faint); }
@@ -578,8 +584,8 @@ details[open] > summary { border-bottom: 1px solid var(--line); }
 }
 
 /* ---- Diagramme réseau en bus ---------------------------------------------------------------- */
-.netmap-wrap { overflow: auto; max-height: calc(100dvh - 190px); border-radius: var(--r-l); border: 1px solid var(--line); background: var(--surface); backdrop-filter: blur(14px); }
-.netmap { border-collapse: separate; border-spacing: 0; min-width: 100%; }
+.netmap-wrap { width: fit-content; max-width: 100%; overflow: auto; max-height: calc(100dvh - 190px); border-radius: var(--r-l); border: 1px solid var(--line); background: var(--surface); backdrop-filter: blur(14px); }
+.netmap { border-collapse: separate; border-spacing: 0; }
 .netmap th, .netmap td { border: 0; padding: 0; }
 .netmap tbody tr:hover { background: none; }
 .netmap thead th {
