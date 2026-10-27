@@ -230,7 +230,7 @@ function applyFilter() {
       (filter === "updates" && row.dataset.upd) || st === filter;
     row.hidden = !okF || (q && !row.dataset.name.includes(q));
   }
-  for (const tr of $$("table[data-filterable] tbody tr")) {
+  for (const tr of $$("table[data-filterable] tbody tr, [data-filterable-cards] > [data-text]")) {
     tr.hidden = q && !tr.dataset.text.toLowerCase().includes(q);
   }
 }
@@ -287,8 +287,16 @@ document.addEventListener("click", async (e) => {
     else location.reload();
     return;
   }
-  const sec = e.target.closest(".secret");
-  if (sec) sec.classList.toggle("shown");
+  const rev = e.target.closest("[data-reveal]");
+  if (rev) {
+    const r = await fetch(`/c/${rev.dataset.id}/env?key=${encodeURIComponent(rev.dataset.reveal)}`);
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok) return toast(b.error || "Lecture impossible", true);
+    const span = document.createElement("span");
+    span.textContent = b.value;
+    rev.parentElement.replaceWith(span);
+    return;
+  }
   const th = e.target.closest("[data-theme-set]");
   if (th) setTheme(th.dataset.themeSet);
 });
@@ -308,6 +316,30 @@ const pending = sessionStorage.getItem("dockerr-op");
 if (pending) {
   sessionStorage.removeItem("dockerr-op");
   try { const p = JSON.parse(pending); follow(p.id, p.stack, p.op); } catch (e) {}
+}
+
+// Network map: hovering a bus or a container highlights its links.
+const map = $("#netmap");
+if (map) {
+  const clear = () => {
+    map.classList.remove("hl");
+    $$(".hl-col, .hl-row", map).forEach((x) => x.classList.remove("hl-col", "hl-row"));
+  };
+  map.addEventListener("pointerover", (e) => {
+    const cell = e.target.closest("[data-col]");
+    const row = e.target.closest("tbody tr:not(.grp)");
+    clear();
+    if (cell && cell.tagName === "TH") {
+      map.classList.add("hl");
+      $$(`[data-col="${cell.dataset.col}"]`, map).forEach((x) => x.classList.add("hl-col"));
+      $$("tbody tr", map).forEach((tr) => tr.classList.add("hl-row"));
+    } else if (row) {
+      map.classList.add("hl");
+      row.classList.add("hl-row");
+      $$("td.bus.on", row).forEach((td) => $$(`[data-col="${td.dataset.col}"]`, map).forEach((x) => x.classList.add("hl-col")));
+    }
+  });
+  map.addEventListener("pointerleave", clear);
 }
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});

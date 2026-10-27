@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -35,6 +36,7 @@ var funcs = template.FuncMap{
 	"base": filepath.Base,
 	"u64":  func(n int64) uint64 { return uint64(max(n, 0)) },
 	"add":  func(a, b int) int { return a + b },
+	"has":  func(list []string, s string) bool { return slices.Contains(list, s) },
 	"dict": func(kv ...any) map[string]any {
 		m := map[string]any{}
 		for i := 0; i+1 < len(kv); i += 2 {

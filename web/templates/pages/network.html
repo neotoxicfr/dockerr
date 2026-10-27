@@ -1,34 +1,38 @@
-{{define "content"}}{{$d := .Data}}
-<header class="bar"><h1>Réseau</h1></header>
-{{if $d.Err}}<div class="error-box">{{$d.Err}}</div>{{end}}
-{{if $d.Groups}}
-<h2 class="section">Réseaux partagés</h2>
-<div class="groups">
-{{range $d.Groups}}
-  <div class="card group">
-    <div class="parent">
-      {{if .Parent}}<span class="dot {{ctrClass .Parent}}"></span><a href="/c/{{short .Parent.ID}}">{{.Parent.Name}}</a>{{if .Parent.Project}} <span class="faint">{{.Parent.Project}}</span>{{end}}
-      {{else}}<span class="dot bad"></span><span class="mono">{{.Missing}}</span> <span class="badge bad">introuvable</span>{{end}}
-    </div>
-    <ul class="tree">{{range .Children}}
-      <li><span class="dot {{ctrClass .}}"></span><a href="/c/{{short .ID}}">{{.Name}}</a>{{if .NetLost}}<span class="bad">réseau perdu</span>{{if .Project}} <button class="btn sm" data-op="repair" data-stack="{{.Project}}">Réparer</button>{{end}}{{end}}</li>
-    {{end}}</ul>
-  </div>
-{{end}}
+{{define "content"}}{{$m := .Data.Map}}
+<header class="bar"><h1>Réseau</h1>
+  <div class="bar-actions"><span class="pill">{{$m.Total}} conteneurs · {{len $m.Cols}} réseaux</span></div>
+</header>
+{{if .Data.Err}}<div class="error-box">{{.Data.Err}}</div>{{end}}
+{{if $m.Groups}}
+<div class="netmap-wrap">
+<table class="netmap" id="netmap">
+  <thead><tr>
+    <th scope="col"><span class="faint small">Conteneur</span></th>
+    {{range $i, $c := $m.Cols}}<th scope="col" data-col="{{$i}}"><span class="bus-h">{{$c.Name}}
+      <small>{{if eq $c.Name "host"}}hôte{{else}}{{$c.Driver}}{{end}} · {{$c.Count}}</small>
+      {{if $c.Internal}}<span class="badge plain">interne</span>{{else}}<span class="badge-sp"></span>{{end}}</span></th>{{end}}
+  </tr></thead>
+  <tbody>
+  {{range $m.Groups}}
+    <tr class="grp"><th scope="rowgroup">{{if .Stack}}{{.Stack}}{{else}}Hors compose{{end}}</th>{{range $m.Cols}}<td class="bus{{if eq .Name "host"}} host{{end}}"></td>{{end}}</tr>
+    {{range .Rows}}{{$r := .}}
+    <tr>
+      <th scope="row">
+        <div class="ctr"><span class="dot {{ctrClass $r.C}}"></span><a href="/c/{{short $r.C.ID}}">{{$r.C.Name}}</a></div>
+        {{if $r.Missing}}<div class="kids"><span class="lost">réseau de {{$r.Missing}} introuvable</span></div>{{end}}
+        {{if $r.Children}}<div class="kids">{{range $r.Children}}<div class="ctr"><span class="dot {{ctrClass .}}"></span><a href="/c/{{short .ID}}">{{.Name}}</a>{{if .NetLost}}<span class="lost">perdu</span>{{end}}</div>{{end}}</div>{{end}}
+      </th>
+      {{range $i, $cell := $r.Cells}}{{$col := index $m.Cols $i}}<td class="bus{{if $cell.On}} on{{end}}{{if eq $col.Name "host"}} host{{end}}" data-col="{{$i}}">{{if $cell.On}}<span class="tap" title="{{$r.C.Name}} sur {{$col.Name}}{{if $cell.IP}} · {{$cell.IP}}{{end}}"></span>{{if $cell.IP}}<span class="ip">{{$cell.IP}}</span>{{end}}{{end}}</td>{{end}}
+    </tr>
+    {{end}}
+  {{end}}
+  </tbody>
+</table>
 </div>
-{{end}}
-{{if $d.Host}}
-<h2 class="section">Réseau de l'hôte</h2>
-<div class="card net host-card"><div class="members">{{range $d.Host}}<a class="chip" href="/c/{{short .ID}}"><span class="dot {{ctrClass .}}"></span>{{.Name}}</a>{{end}}</div></div>
-{{end}}
-<h2 class="section">Réseaux</h2>
-<div class="nets">
-{{range $d.Networks}}
-  <div class="card net">
-    <h3>{{.Name}}{{if .Internal}} <span class="badge plain">interne</span>{{end}}</h3>
-    <div class="faint">{{.Driver}}{{if .Project}} · {{.Project}}{{end}}</div>
-    {{if .Containers}}<div class="members">{{range .Containers}}<a class="chip" href="/c/{{short .ID}}"><span class="dot {{ctrClass .}}"></span>{{.Name}}</a>{{end}}</div>{{end}}
-  </div>
-{{end}}
+<div class="netmap-legend">
+  <span><i class="sw"></i>relié au réseau, avec son adresse</span>
+  <span><i class="sw host"></i>réseau de l'hôte</span>
+  <span><i class="sw kid"></i>partage le réseau du conteneur au-dessus (network_mode)</span>
 </div>
+{{else}}<div class="card empty"><p>Aucun conteneur.</p></div>{{end}}
 {{end}}

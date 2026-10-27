@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/moby/moby/client"
 
+	"github.com/neotoxicfr/dockerr/internal/auth"
 	"github.com/neotoxicfr/dockerr/internal/netdeps"
 	"github.com/neotoxicfr/dockerr/internal/stacks"
 )
@@ -39,8 +42,21 @@ type imageRow struct {
 
 type networkRow struct {
 	ID, Name, Driver, Project string
-	Internal                  bool
+	Scope                     string
+	Internal, Attachable      bool
+	IPv6                      bool
+	Created                   string
+	Subnets                   []kv // subnet → gateway
+	Options                   []kv
 	Containers                []*stacks.Container
+	Members                   []netMember
+}
+
+// netMember is a container's endpoint on a network.
+type netMember struct {
+	C               *stacks.Container // nil when not listed (another host, etc.)
+	Name            string
+	IPv4, IPv6, MAC string
 }
 
 type volumeRow struct {
@@ -118,13 +134,51 @@ func (s *Server) networkRows(ctx context.Context, all []*stacks.Container) ([]ne
 	if err != nil {
 		return nil, err
 	}
+	byID := map[string]*stacks.Container{}
+	for _, c := range all {
+		byID[c.ID] = c
+	}
 	var out []networkRow
 	for _, n := range res.Items {
-		row := networkRow{ID: n.ID, Name: n.Name, Driver: n.Driver, Internal: n.Internal, Project: n.Labels[api.ProjectLabel]}
+		row := networkRow{ID: n.ID, Name: n.Name, Driver: n.Driver, Scope: n.Scope, Internal: n.Internal, Attachable: n.Attachable,
+			IPv6: n.EnableIPv6, Project: n.Labels[api.ProjectLabel]}
+		if !n.Created.IsZero() {
+			row.Created = n.Created.Local().Format("02/01/2006 15:04")
+		}
 		for _, c := range all {
 			if slices.Contains(c.Networks, n.Name) {
 				row.Containers = append(row.Containers, c)
 			}
+		}
+		// The list has no addresses: inspect each network.
+		if in, err := s.docker.API.NetworkInspect(ctx, n.ID, client.NetworkInspectOptions{}); err == nil {
+			for _, cfg := range in.Network.IPAM.Config {
+				sub, gw := "", ""
+				if cfg.Subnet.IsValid() {
+					sub = cfg.Subnet.String()
+				}
+				if cfg.Gateway.IsValid() {
+					gw = cfg.Gateway.String()
+				}
+				if sub != "" {
+					row.Subnets = append(row.Subnets, kv{sub, gw})
+				}
+			}
+			for k, v := range in.Network.Options {
+				row.Options = append(row.Options, kv{k, v})
+			}
+			sort.Slice(row.Options, func(i, j int) bool { return row.Options[i].K < row.Options[j].K })
+			for id, ep := range in.Network.Containers {
+				m := netMember{C: byID[id], Name: ep.Name, MAC: ep.MacAddress.String()}
+				if ep.IPv4Address.IsValid() {
+					m.IPv4 = ep.IPv4Address.Addr().String()
+				}
+				if ep.IPv6Address.IsValid() {
+					m.IPv6 = ep.IPv6Address.Addr().String()
+				}
+				row.Members = append(row.Members, m)
+			}
+			sort.Slice(row.Members, func(i, j int) bool { return row.Members[i].Name < row.Members[j].Name })
 		}
 		out = append(out, row)
 	}
@@ -167,6 +221,7 @@ type ctrView struct {
 	RestartCount int
 	Mounts       []kv
 	Env          []kv
+	Secret       []string // env keys whose value stays masked
 	LabelList    []kv
 	IPs          []kv
 	Children     []*stacks.Container
@@ -214,6 +269,10 @@ func (s *Server) containerPage(w http.ResponseWriter, r *http.Request) {
 		v.Cmd = strings.Join(append(slices.Clone(in.Config.Entrypoint), in.Config.Cmd...), " ")
 		for _, e := range in.Config.Env {
 			k, val, _ := strings.Cut(e, "=")
+			if sensitiveKey.MatchString(k) {
+				val = "" // never in the page: fetched when the user clicks
+				v.Secret = append(v.Secret, k)
+			}
 			v.Env = append(v.Env, kv{k, val})
 		}
 		for k, val := range in.Config.Labels {
@@ -334,17 +393,9 @@ func (s *Server) imageRemove(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-type shareGroup struct {
-	Parent   *stacks.Container
-	Missing  string // parent reference when the parent is gone
-	Children []*stacks.Container
-}
-
 type networkData struct {
-	Groups   []shareGroup
-	Networks []networkRow
-	Host     []*stacks.Container
-	Err      string
+	Map netMap
+	Err string
 }
 
 func (s *Server) networkPage(w http.ResponseWriter, r *http.Request) {
@@ -358,45 +409,15 @@ func (s *Server) networkPage(w http.ResponseWriter, r *http.Request) {
 		s.render(w, r, "network", "Réseau", "network", d)
 		return
 	}
-	byParent := map[string]*shareGroup{}
-	var order []string
-	for _, c := range all {
-		ref := netdeps.Ref(c.NetworkMode)
-		switch {
-		case c.NetworkMode == "host":
-			d.Host = append(d.Host, c)
-		case ref != "":
-			key := c.NetParent
-			g := byParent[key]
-			if g == nil {
-				g = &shareGroup{Missing: key}
-				for _, p := range all {
-					if p.Name == key {
-						g.Parent, g.Missing = p, ""
-					}
-				}
-				byParent[key] = g
-				order = append(order, key)
-			}
-			g.Children = append(g.Children, c)
-		}
-	}
-	sort.Strings(order)
-	for _, k := range order {
-		d.Groups = append(d.Groups, *byParent[k])
-	}
+	drivers := map[string]mapCol{}
 	if s.docker.Caps.Networks {
-		rows, err := s.networkRows(r.Context(), all)
-		if err != nil {
-			d.Err = err.Error()
-		}
-		for _, n := range rows {
-			if n.Name == "none" || n.Name == "host" {
-				continue
+		if res, err := s.docker.API.NetworkList(r.Context(), client.NetworkListOptions{}); err == nil {
+			for _, n := range res.Items {
+				drivers[n.Name] = mapCol{Driver: n.Driver, Internal: n.Internal}
 			}
-			d.Networks = append(d.Networks, n)
 		}
 	}
+	d.Map = buildNetMap(all, drivers)
 	s.render(w, r, "network", "Réseau", "network", d)
 }
 
@@ -407,4 +428,32 @@ func isoDate(s string) string {
 		return ""
 	}
 	return t.Local().Format("02/01/2006 15:04:05")
+}
+
+// sensitiveKey matches environment variables that likely hold a secret.
+var sensitiveKey = regexp.MustCompile(`(?i)pass|secret|token|key|pwd|auth|cred|private|salt`)
+
+// containerEnv returns one environment value, for the reveal button.
+func (s *Server) containerEnv(w http.ResponseWriter, r *http.Request) {
+	if !s.advancedOnly(w, r) {
+		return
+	}
+	c, _, ok := s.findContainer(w, r)
+	if !ok {
+		return
+	}
+	res, err := s.docker.API.ContainerInspect(r.Context(), c.ID, client.ContainerInspectOptions{})
+	if err != nil || res.Container.Config == nil {
+		jsonError(w, http.StatusBadGateway, "inspection impossible")
+		return
+	}
+	key := r.URL.Query().Get("key")
+	for _, e := range res.Container.Config.Env {
+		if k, v, _ := strings.Cut(e, "="); k == key {
+			slog.Info("env revealed", "user", auth.User(r.Context()), "container", c.Name, "key", key)
+			writeJSON(w, http.StatusOK, map[string]string{"value": v})
+			return
+		}
+	}
+	jsonError(w, http.StatusNotFound, "variable inconnue")
 }

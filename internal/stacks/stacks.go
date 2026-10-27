@@ -80,7 +80,8 @@ type Container struct {
 	Ports                    []Port
 	NetworkMode              string
 	Networks                 []string
-	Volumes                  []string // named volumes mounted
+	Volumes                  []string          // named volumes mounted
+	IPs                      map[string]string // network → IPv4
 	Labels                   map[string]string
 
 	// NetParent names the container whose network namespace this one joins.
@@ -215,8 +216,14 @@ func (m *Manager) Containers(ctx context.Context) ([]*Container, error) {
 		}
 		sort.Slice(c.Ports, func(i, j int) bool { return c.Ports[i].Public < c.Ports[j].Public })
 		if s.NetworkSettings != nil {
-			for n := range s.NetworkSettings.Networks {
+			for n, ep := range s.NetworkSettings.Networks {
 				c.Networks = append(c.Networks, n)
+				if ep != nil && ep.IPAddress.IsValid() {
+					if c.IPs == nil {
+						c.IPs = map[string]string{}
+					}
+					c.IPs[n] = ep.IPAddress.String()
+				}
 			}
 			sort.Strings(c.Networks)
 		}

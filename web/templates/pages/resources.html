@@ -46,17 +46,38 @@
 {{if eq $d.Tab "networks"}}
 {{if not $caps.Networks}}<div class="error-box">Le proxy Docker refuse l'accès aux réseaux (NETWORKS=1).</div>{{else}}
 <div class="section-bar"><span class="grow"></span><button class="btn" data-prune="networks" data-confirm="Supprimer les réseaux qu'aucun conteneur n'utilise ?">Supprimer les inutilisés</button></div>
-<div class="table-wrap"><table data-filterable>
-  <thead><tr><th>Réseau</th><th>Pilote</th><th>Pile</th><th>Conteneurs</th></tr></thead>
-  <tbody>{{range $d.Networks}}
-  <tr data-text="{{.Name}} {{.Project}}">
-    <td><strong>{{.Name}}</strong>{{if .Internal}} <span class="badge plain">interne</span>{{end}}</td>
-    <td class="muted">{{.Driver}}</td>
-    <td>{{if .Project}}<a href="/s/{{.Project}}">{{.Project}}</a>{{else}}<span class="faint">—</span>{{end}}</td>
-    <td class="muted">{{len .Containers}}</td>
-  </tr>{{end}}</tbody>
-</table></div>
-{{end}}{{end}}
+<div class="netcards" data-filterable-cards>
+{{range $d.Networks}}
+<details class="card netcard" data-text="{{.Name}} {{.Project}} {{range .Subnets}}{{.K}} {{end}}{{range .Members}}{{.Name}} {{.IPv4}} {{end}}">
+  <summary>
+    <svg class="i s chev"><use href="#i-chev"/></svg>
+    <span class="nname"><svg class="i s"><use href="#i-network"/></svg><span>{{.Name}}</span>{{if .Internal}}<span class="badge plain">interne</span>{{end}}</span>
+    <span class="nsub">{{range .Subnets}}<span class="chip mono">{{.K}}</span>{{end}}</span>
+    <span class="faint small">{{len .Members}} {{plural (len .Members) "conteneur" "conteneurs"}}</span>
+  </summary>
+  <dl class="netfacts">
+    <div><dt>Pilote</dt><dd>{{.Driver}} · {{.Scope}}</dd></div>
+    {{range .Subnets}}<div><dt>Sous-réseau</dt><dd>{{.K}}</dd></div><div><dt>Passerelle</dt><dd>{{if .V}}{{.V}}{{else}}—{{end}}</dd></div>{{end}}
+    <div><dt>IPv6</dt><dd>{{if .IPv6}}oui{{else}}non{{end}}</dd></div>
+    <div><dt>Interne</dt><dd>{{if .Internal}}oui, sans accès extérieur{{else}}non{{end}}</dd></div>
+    <div><dt>Attachable</dt><dd>{{if .Attachable}}oui{{else}}non{{end}}</dd></div>
+    {{if .Project}}<div><dt>Pile</dt><dd><a href="/s/{{.Project}}">{{.Project}}</a></dd></div>{{end}}
+    {{if .Created}}<div><dt>Créé</dt><dd>{{.Created}}</dd></div>{{end}}
+    <div><dt>ID</dt><dd>{{short .ID}}</dd></div>
+    {{range .Options}}<div><dt>{{.K}}</dt><dd>{{.V}}</dd></div>{{end}}
+  </dl>
+  {{if .Members}}<div class="table-wrap"><table>
+    <thead><tr><th>Conteneur</th><th>IPv4</th><th>IPv6</th><th>MAC</th></tr></thead>
+    <tbody>{{range .Members}}<tr>
+      <td>{{if .C}}<a class="cell-name" href="/c/{{short .C.ID}}"><span class="dot {{ctrClass .C}}"></span>{{.Name}}</a>{{else}}{{.Name}}{{end}}</td>
+      <td class="mono">{{if .IPv4}}{{.IPv4}}{{else}}<span class="faint">—</span>{{end}}</td>
+      <td class="mono">{{if .IPv6}}{{.IPv6}}{{else}}<span class="faint">—</span>{{end}}</td>
+      <td class="mono faint">{{.MAC}}</td>
+    </tr>{{end}}</tbody>
+  </table></div>{{end}}
+</details>
+{{end}}
+</div>{{end}}{{end}}
 
 {{if eq $d.Tab "volumes"}}
 {{if not $caps.Volumes}}<div class="error-box">Le proxy Docker refuse l'accès aux volumes (VOLUMES=1).</div>{{else}}

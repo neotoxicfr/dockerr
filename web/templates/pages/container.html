@@ -36,7 +36,7 @@
 </div></section>{{end}}
 
 {{if $c.Env}}<section class="panel"><h2>Variables</h2><div class="card kv">
-  {{range $c.Env}}<div class="k mono">{{.K}}</div><div class="mono"><span class="secret" title="Afficher" tabindex="0">{{.V}}</span></div>{{end}}
+  {{range $c.Env}}<div class="k mono">{{.K}}</div><div class="mono">{{if has $c.Secret .K}}<span class="masked"><span class="dots" aria-label="valeur masquée">••••••••</span><button type="button" class="btn ghost sm" data-reveal="{{.K}}" data-id="{{short $c.ID}}"><svg class="i s"><use href="#i-eye"/></svg>Afficher</button></span>{{else}}{{.V}}{{end}}</div>{{end}}
 </div></section>{{end}}
 
 <section class="panel"><details class="card"><summary>Labels</summary><div class="kv">
