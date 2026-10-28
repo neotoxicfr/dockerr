@@ -47,6 +47,8 @@ services:
       # DOCKERR_REQUIRE_GROUP: admins
       # DOCKERR_DOZZLE_URL: https://log.example.com
       # DOCKERR_EXEC: 1
+      # Read-only status for a dashboard: SHA-256 of its key, one per line.
+      # DOCKERR_API_KEYS_FILE: /data/api_keys
       TZ: Europe/Paris
     volumes:
       - /mnt/docker:/mnt/docker

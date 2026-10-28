@@ -30,6 +30,9 @@ type Config struct {
 	ExecEnabled bool
 	// DozzleURL, when set, adds a logs link per container.
 	DozzleURL string
+	// APIKeysFile lists SHA-256 hashes (hex, one per line) of the keys that
+	// may read /api/status. Empty: the endpoint is off.
+	APIKeysFile string
 	// PortHost is the host used in links to published ports; by default the
 	// host dockerr is reached on.
 	PortHost string
@@ -52,6 +55,7 @@ func Load() (*Config, error) {
 		ExecEnabled:    envBool("DOCKERR_EXEC", false),
 		DozzleURL:      strings.TrimRight(os.Getenv("DOCKERR_DOZZLE_URL"), "/"),
 		PortHost:       os.Getenv("DOCKERR_PORT_HOST"),
+		APIKeysFile:    os.Getenv("DOCKERR_API_KEYS_FILE"),
 		RepairNetDeps:  envBool("DOCKERR_REPAIR_NETDEPS", true),
 	}
 	var err error

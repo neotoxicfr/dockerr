@@ -164,9 +164,27 @@ Each stack is a folder under `DOCKERR_STACKS_DIR` holding `compose.yaml`,
 | `DOCKERR_EXEC` | `false` | container terminal (also needs `EXEC=1` on the proxy) |
 | `DOCKERR_UPDATE_INTERVAL` | `6h` | image update checks |
 | `DOCKERR_REPAIR_NETDEPS` | `true` | repair lost network namespaces after operations |
+| `DOCKERR_API_KEYS_FILE` | — | SHA-256 hashes of the keys allowed to read `GET /api/status` (see below) |
 | `DOCKERR_DATA_DIR` | `/data` | SQLite database: history, preferences, terminal log |
 | `DOCKERR_LISTEN` | `:8080` | |
 | `DOCKERR_INSECURE_NOAUTH` | `false` | no authentication, local development only |
+
+### Status API for dashboards
+
+`GET /api/status` returns counts for a dashboard tile, read-only: stacks by
+state, containers running, stacks and services with image updates, last
+update check, containers that lost their network. It contains stack names but
+nothing from compose files, environments or secrets.
+
+It answers only with `Authorization: Bearer <key>` or `X-Api-Key: <key>`, where
+the key's SHA-256 (hex) is a line of `DOCKERR_API_KEYS_FILE`; dockerr never
+stores the key itself. Generate one and its hash:
+
+```sh
+key=$(openssl rand -hex 32); printf '%s' "$key" | sha256sum | cut -d' ' -f1 >> /path/to/api_keys
+```
+
+The file is read on each request: removing a line revokes the key.
 
 ### Socket proxy rights
 
