@@ -186,6 +186,12 @@ key=$(openssl rand -hex 32); printf '%s' "$key" | sha256sum | cut -d' ' -f1 >> /
 
 The file is read on each request: removing a line revokes the key.
 
+A line ending in `scope=check` holds a key for `POST /api/updates/check`
+instead, which starts an image update check (HEAD requests to the registries,
+no pull, nothing restarted; at most once every 5 minutes, 429 otherwise). Each
+key has one scope: the check key cannot read the status, and the other way
+round.
+
 ### Socket proxy rights
 
 dockerr probes the proxy at start and greys out what it cannot do, naming the

@@ -2,11 +2,14 @@ package server
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,9 +18,12 @@ import (
 )
 
 // apiKeyOK accepts "Authorization: Bearer <key>" or "X-Api-Key: <key>" when
-// the key's SHA-256 is listed in the keys file. The file is read on each
-// request, so a key is added or revoked without a restart.
-func apiKeyOK(r *http.Request, keysFile string) bool {
+// the key's SHA-256 is listed in the keys file with that scope. A line is
+// "<sha256 hex> [scope=status|check] [comment]"; without scope= it is a
+// status key. Each key has one scope: the check key cannot read the status
+// and the status key cannot start a check. The file is read on each request,
+// so a key is added or revoked without a restart.
+func apiKeyOK(r *http.Request, keysFile, scope string) bool {
 	if keysFile == "" {
 		return false
 	}
@@ -42,8 +48,15 @@ func apiKeyOK(r *http.Request, keysFile string) bool {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		want, err := hex.DecodeString(strings.Fields(line)[0])
-		if err == nil && len(want) == len(sum) && subtle.ConstantTimeCompare(want, sum[:]) == 1 {
+		fields := strings.Fields(line)
+		lineScope := "status"
+		for _, f := range fields[1:] {
+			if v, ok := strings.CutPrefix(f, "scope="); ok {
+				lineScope = v
+			}
+		}
+		want, err := hex.DecodeString(fields[0])
+		if err == nil && len(want) == len(sum) && subtle.ConstantTimeCompare(want, sum[:]) == 1 && lineScope == scope {
 			ok = true // no early return: same time whichever line matches
 		}
 	}
@@ -128,7 +141,7 @@ var statusCache struct {
 
 // apiStatus serves a summary for dashboards, read-only, cached 15 s.
 func (s *Server) apiStatus(w http.ResponseWriter, r *http.Request) {
-	if !apiKeyOK(r, s.cfg.APIKeysFile) {
+	if !apiKeyOK(r, s.cfg.APIKeysFile, "status") {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="dockerr"`)
 		jsonError(w, http.StatusUnauthorized, "clé d'API absente ou invalide")
 		return
@@ -145,4 +158,33 @@ func (s *Server) apiStatus(w http.ResponseWriter, r *http.Request) {
 		statusCache.val, statusCache.at = buildStatus(all, list, last, checking), time.Now()
 	}
 	writeJSON(w, http.StatusOK, statusCache.val)
+}
+
+// apiCheck starts an image update check: HEAD requests to the registries,
+// no pull, nothing restarted. Idempotent, and at most once every 5 minutes.
+func (s *Server) apiCheck(w http.ResponseWriter, r *http.Request) {
+	if !apiKeyOK(r, s.cfg.APIKeysFile, "check") {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="dockerr"`)
+		jsonError(w, http.StatusUnauthorized, "clé d'API absente ou invalide")
+		return
+	}
+	last, running := s.updates.LastRun()
+	switch {
+	case running:
+		writeJSON(w, http.StatusAccepted, map[string]any{"started": false, "reason": "contrôle déjà en cours"})
+		return
+	case !last.IsZero() && time.Since(last) < 5*time.Minute:
+		w.Header().Set("Retry-After", strconv.Itoa(int((5*time.Minute-time.Since(last)).Seconds())+1))
+		writeJSON(w, http.StatusTooManyRequests, map[string]any{"started": false, "reason": "dernier contrôle il y a moins de 5 minutes"})
+		return
+	}
+	refs := s.imageRefs(r.Context())
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		s.updates.Check(ctx, refs)
+		s.events.Notify()
+	}()
+	slog.Info("update check started by API", "images", len(refs))
+	writeJSON(w, http.StatusAccepted, map[string]any{"started": true, "images": len(refs)})
 }

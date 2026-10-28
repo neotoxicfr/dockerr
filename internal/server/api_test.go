@@ -19,7 +19,9 @@ func TestAPIKey(t *testing.T) {
 	key := "k3y-0123456789abcdef0123456789abcdef" // gitleaks:allow (fake test key)
 	sum := sha256.Sum256([]byte(key))
 	f := filepath.Join(t.TempDir(), "keys")
-	if err := os.WriteFile(f, []byte("# nehome\n"+hex.EncodeToString(sum[:])+" nehome\n"), 0o600); err != nil {
+	checkKey := "chk-0123456789abcdef0123456789abcdef" // gitleaks:allow (fake test key)
+	csum := sha256.Sum256([]byte(checkKey))
+	if err := os.WriteFile(f, []byte("# nehome\n"+hex.EncodeToString(sum[:])+" nehome\n"+hex.EncodeToString(csum[:])+" scope=check nehome\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	req := func(h, v string) *http.Request {
@@ -30,21 +32,25 @@ func TestAPIKey(t *testing.T) {
 		return r
 	}
 	cases := []struct {
-		name string
-		r    *http.Request
-		file string
-		want bool
+		name  string
+		r     *http.Request
+		file  string
+		scope string
+		want  bool
 	}{
-		{"bearer", req("Authorization", "Bearer "+key), f, true},
-		{"x-api-key", req("X-Api-Key", key), f, true},
-		{"wrong key", req("X-Api-Key", key+"x"), f, false},
-		{"short key", req("X-Api-Key", "abc"), f, false},
-		{"no key", req("", ""), f, false},
-		{"endpoint off", req("X-Api-Key", key), "", false},
-		{"missing file", req("X-Api-Key", key), f + ".none", false},
+		{"bearer", req("Authorization", "Bearer "+key), f, "status", true},
+		{"x-api-key", req("X-Api-Key", key), f, "status", true},
+		{"wrong key", req("X-Api-Key", key+"x"), f, "status", false},
+		{"short key", req("X-Api-Key", "abc"), f, "status", false},
+		{"no key", req("", ""), f, "status", false},
+		{"endpoint off", req("X-Api-Key", key), "", "status", false},
+		{"missing file", req("X-Api-Key", key), f + ".none", "status", false},
+		{"status key cannot check", req("X-Api-Key", key), f, "check", false},
+		{"check key checks", req("X-Api-Key", checkKey), f, "check", true},
+		{"check key cannot read status", req("X-Api-Key", checkKey), f, "status", false},
 	}
 	for _, c := range cases {
-		if got := apiKeyOK(c.r, c.file); got != c.want {
+		if got := apiKeyOK(c.r, c.file, c.scope); got != c.want {
 			t.Errorf("%s: %v, want %v", c.name, got, c.want)
 		}
 	}
