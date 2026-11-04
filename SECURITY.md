@@ -76,5 +76,5 @@ runs as non-root by default. Editing compose files owned by root needs
   published unless it passes.
 - The editor and terminal bundles (CodeMirror, xterm.js) are vendored, built
   from a pinned `package-lock.json`; nothing loads from a CDN.
-- Dependabot watches the Go modules, the Dockerfile,
-  the workflows and the vendored npm bundles, with a week of cooldown.
+- Dependabot checks the Go modules, the Dockerfile, the workflows and the
+  vendored npm bundles every day.
