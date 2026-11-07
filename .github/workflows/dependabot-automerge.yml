@@ -1,0 +1,37 @@
+name: Dependabot auto-merge
+
+# Asks GitHub to squash-merge a Dependabot pull request once every required
+# check on dev has passed (branch protection makes it wait). Only minor and
+# patch updates of Go modules, GitHub Actions and Docker images: major
+# versions and the npm bundle sources (whose web/static/vendor must be
+# rebuilt) stay manual.
+
+on:
+  pull_request:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+jobs:
+  automerge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+
+      - name: Enable auto-merge
+        if: >-
+          steps.meta.outputs.package-ecosystem != 'npm_and_yarn' &&
+          (steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+           steps.meta.outputs.update-type == 'version-update:semver-minor')
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

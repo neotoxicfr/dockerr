@@ -54,6 +54,21 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
           govulncheck ./...
 
+  vendor:
+    name: Vendored bundles
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # web/static/vendor is built from tools/vendor: a dependency bump that is
+    # not followed by tools/vendor/build.sh would ship the old bundle.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Rebuild and compare
+        run: |
+          tools/vendor/build.sh
+          git diff --stat --exit-code web/static/vendor
+
   security-scan:
     name: Trivy filesystem scan
     runs-on: ubuntu-latest
