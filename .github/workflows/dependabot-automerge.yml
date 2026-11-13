@@ -4,8 +4,8 @@ name: Auto-merge
 # passes, whatever the kind of update:
 # - Dependabot ones on the checks alone (CodeRabbit ignores them);
 # - the maintainer's ones only after CodeRabbit has really reviewed the
-#   head commit. A skipped, rate-limited or failed review asks CodeRabbit
-#   again once, later; the pull request stays open until a real review.
+#   head commit. After a skipped, rate-limited or failed review the pull
+#   request stays open, with one comment, until someone asks again.
 # A failing check leaves the pull request open.
 #
 # Dependabot security updates always target main: they are moved to dev,
@@ -91,21 +91,13 @@ jobs:
           [ "$author" = "$OWNER" ] || exit 0
 
           if [ "$CONCLUSION" != success ] || ! grep -q 'Review completed' <<< "$SUMMARY"; then
-            # No real review of this commit: ask again once per pull request,
-            # later. CodeRabbit ignores commands from bots and draft toggles,
-            # but reviews new commits: push an empty one, then run CI on it
-            # (a push made with GITHUB_TOKEN starts no workflow).
-            mark="Revue CodeRabbit redemandée"
+            # No real review of this commit: the pull request stays open.
+            # CodeRabbit ignores commands from bots, draft toggles, and carries
+            # its previous verdict forward on an empty commit, so a workflow
+            # cannot ask again: say it once, for a person to ask.
+            mark="Pas de revue CodeRabbit complète"
             gh pr view "$PR" --json comments --jq '.comments[].body' | grep -qF "$mark" && exit 0
-            sleep 900
-            [ "$(gh pr view "$PR" --json headRefOid --jq .headRefOid)" = "$SHA" ] || exit 0
-            branch=$(gh pr view "$PR" --json headRefName --jq .headRefName)
-            tree=$(gh api "repos/$GH_REPO/git/commits/$SHA" --jq .tree.sha)
-            new=$(gh api "repos/$GH_REPO/git/commits" -f message="chore: ask CodeRabbit to review again" \
-              -f tree="$tree" -f "parents[]=$SHA" --jq .sha)
-            gh api -X PATCH "repos/$GH_REPO/git/refs/heads/$branch" -f sha="$new" >/dev/null
-            gh workflow run ci.yml --ref "$branch"
-            gh pr comment "$PR" --body "$mark (${SHA:0:7} non relu)."
+            gh pr comment "$PR" --body "$mark pour ${SHA:0:7} : PR laissée ouverte."
             exit 0
           fi
 
