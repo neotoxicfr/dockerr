@@ -11,8 +11,7 @@ tone_instructions: >-
 
 reviews:
   profile: chill
-  # Never approve or request changes: a Dependabot pull request that passes
-  # the required checks on dev is merged automatically and must stay so.
+  # Never approve or request changes: the required checks decide.
   auto_approvals:
     enabled: false
   high_level_summary: true
@@ -46,8 +45,9 @@ reviews:
     base_branches:
       - "^main$"
       - "^dev$"
-    # Dependabot pull requests are reviewed too: nobody is ignored.
-    ignore_usernames: []
+    # Bot pull requests: the checks decide, no review.
+    ignore_usernames:
+      - "dependabot[bot]"
 
   path_filters:
     - "!web/static/vendor/**"
@@ -71,8 +71,9 @@ reviews:
         - `user: "0:0"` dans le compose d'exemple : dockerr doit écrire des
           fichiers compose appartenant à root, et l'accès à Docker vaut déjà
           root ;
-        - Dependabot quotidien sans délai d'attente et fusion automatique des
-          montées mineures et correctives : choix du mainteneur ;
+        - Dependabot quotidien sans délai d'attente, et fusion automatique dans
+          dev de toute PR dont les contrôles passent, majeures comprises :
+          choix du mainteneur ;
         - une dépendance montée à la dernière version publiée plutôt qu'à la
           plus petite qui corrige : règle du projet.
 

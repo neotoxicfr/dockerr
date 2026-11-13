@@ -1,37 +1,59 @@
-name: Dependabot auto-merge
+name: Auto-merge
 
-# Asks GitHub to squash-merge a Dependabot pull request once every required
-# check on dev has passed (branch protection makes it wait). Only minor and
-# patch updates of Go modules, GitHub Actions and Docker images: major
-# versions and the npm bundle sources (whose web/static/vendor must be
-# rebuilt) stay manual.
+# Every pull request to dev from Dependabot or the maintainer merges by
+# itself once all required checks pass, whatever the kind of update: the
+# checks decide. A failing one leaves it open. Dependabot security updates
+# always target main: they are moved to dev, never merged into main.
+#
+# A merge made with GITHUB_TOKEN starts no push workflow, so the job waits
+# for the merge and then publishes the dev image itself.
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, main]
 
 permissions:
   contents: read
 
+concurrency:
+  group: automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   automerge:
-    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' ||
+      (github.event.pull_request.user.login == github.repository_owner &&
+       github.base_ref == 'dev')
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 60
     permissions:
+      actions: write
       contents: write
       pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
     steps:
-      - name: Dependabot metadata
-        id: meta
-        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+      - name: Move a security update to dev
+        if: github.base_ref == 'main'
+        run: |
+          gh pr edit "$PR" --base dev
+          gh workflow run ci.yml --ref "$HEAD_REF"
 
-      - name: Enable auto-merge
-        if: >-
-          steps.meta.outputs.package-ecosystem != 'npm_and_yarn' &&
-          (steps.meta.outputs.update-type == 'version-update:semver-patch' ||
-           steps.meta.outputs.update-type == 'version-update:semver-minor')
-        run: gh pr merge --auto --squash "$PR_URL"
-        env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Merge when green, then publish
+        run: |
+          gh pr merge "$PR" --auto --squash
+          for _ in $(seq 1 110); do
+            sleep 30
+            case "$(gh pr view "$PR" --json state --jq .state || true)" in
+              MERGED) gh workflow run docker-publish.yml --ref dev; exit 0 ;;
+              CLOSED) exit 0 ;;
+            esac
+            # A failed check leaves the pull request open: nothing to wait for.
+            failed=$(gh pr checks "$PR" --required --json bucket \
+              --jq 'any(.[]; .bucket == "fail")' || true)
+            if [ "$failed" = true ]; then exit 0; fi
+          done

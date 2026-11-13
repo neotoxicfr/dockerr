@@ -19,6 +19,10 @@ updates:
       interval: "daily"
     commit-message:
       prefix: "chore(deps)"
+    groups:
+      docker:
+        patterns:
+          - "*"
 
   - package-ecosystem: "gomod"
     directory: "/"
