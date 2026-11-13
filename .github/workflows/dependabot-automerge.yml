@@ -1,35 +1,33 @@
 name: Auto-merge
 
-# Every pull request to dev from Dependabot or the maintainer merges by
-# itself once all required checks pass, whatever the kind of update: the
-# checks decide. A failing one leaves it open. Dependabot security updates
-# always target main: they are moved to dev, never merged into main.
+# A pull request to dev from Dependabot or the maintainer merges by itself
+# once CodeRabbit has really reviewed its head commit and every required
+# check passes, whatever the kind of update. A skipped, rate-limited or
+# failed review asks CodeRabbit again once, later; the pull request stays
+# open until a real review. A failing check leaves it open too.
+#
+# Dependabot security updates always target main: they are moved to dev,
+# never merged into main.
 #
 # A merge made with GITHUB_TOKEN starts no push workflow, so the job waits
 # for the merge and then publishes the dev image itself.
 
 on:
   pull_request:
-    branches: [dev, main]
+    branches: [main]
+  check_run:
+    types: [completed]
 
 permissions:
   contents: read
 
-concurrency:
-  group: automerge-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 jobs:
-  automerge:
-    if: >-
-      github.event.pull_request.user.login == 'dependabot[bot]' ||
-      (github.event.pull_request.user.login == github.repository_owner &&
-       github.base_ref == 'dev')
+  to-dev:
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 5
     permissions:
       actions: write
-      contents: write
       pull-requests: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -37,14 +35,48 @@ jobs:
       PR: ${{ github.event.pull_request.number }}
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
     steps:
-      - name: Move a security update to dev
-        if: github.base_ref == 'main'
-        run: |
+      - run: |
           gh pr edit "$PR" --base dev
           gh workflow run ci.yml --ref "$HEAD_REF"
 
-      - name: Merge when green, then publish
-        run: |
+  merge:
+    if: >-
+      github.event_name == 'check_run' &&
+      github.event.check_run.app.slug == 'coderabbitai' &&
+      github.event.check_run.pull_requests[0] != null
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: automerge-${{ github.event.check_run.pull_requests[0].number }}
+      cancel-in-progress: true
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.check_run.pull_requests[0].number }}
+      SHA: ${{ github.event.check_run.head_sha }}
+      CONCLUSION: ${{ github.event.check_run.conclusion }}
+      SUMMARY: ${{ github.event.check_run.output.summary }}
+      OWNER: ${{ github.repository_owner }}
+    steps:
+      - run: |
+          read -r base author head <<< "$(gh pr view "$PR" --json baseRefName,author,headRefOid \
+            --jq '"\(.baseRefName) \(.author.login) \(.headRefOid)"')"
+          [ "$base" = dev ] && [ "$head" = "$SHA" ] || exit 0
+          [ "$author" = app/dependabot ] || [ "$author" = "$OWNER" ] || exit 0
+
+          if [ "$CONCLUSION" != success ] || ! grep -q 'Review completed' <<< "$SUMMARY"; then
+            # No real review of this commit: ask again once, later.
+            mark="Revue CodeRabbit redemandée pour ${SHA:0:7}"
+            gh pr view "$PR" --json comments --jq '.comments[].body' | grep -qF "$mark" && exit 0
+            sleep 900
+            gh pr comment "$PR" --body "@coderabbitai review"$'\n\n'"$mark"
+            exit 0
+          fi
+
           gh pr merge "$PR" --auto --squash
           for _ in $(seq 1 110); do
             sleep 30
@@ -52,7 +84,6 @@ jobs:
               MERGED) gh workflow run docker-publish.yml --ref dev; exit 0 ;;
               CLOSED) exit 0 ;;
             esac
-            # A failed check leaves the pull request open: nothing to wait for.
             failed=$(gh pr checks "$PR" --required --json bucket \
               --jq 'any(.[]; .bucket == "fail")' || true)
             if [ "$failed" = true ]; then exit 0; fi
