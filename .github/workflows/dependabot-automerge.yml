@@ -117,6 +117,8 @@ jobs:
               pass)
                 if gh pr merge "$PR" --squash --match-head-commit "$SHA"; then
                   gh workflow run docker-publish.yml --ref dev
+                  branch=$(gh pr view "$PR" --json headRefName --jq .headRefName)
+                  gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$branch" || true
                   exit 0
                 fi ;;
             esac
