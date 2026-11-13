@@ -92,21 +92,34 @@ jobs:
 
           if [ "$CONCLUSION" != success ] || ! grep -q 'Review completed' <<< "$SUMMARY"; then
             # No real review of this commit: ask again once, later.
+            # CodeRabbit ignores commands from bots; it does review a pull
+            # request that becomes ready for review.
             mark="Revue CodeRabbit redemandée pour ${SHA:0:7}"
             gh pr view "$PR" --json comments --jq '.comments[].body' | grep -qF "$mark" && exit 0
             sleep 900
-            gh pr comment "$PR" --body "@coderabbitai review"$'\n\n'"$mark"
+            gh pr comment "$PR" --body "$mark"
+            gh pr ready "$PR" --undo
+            gh pr ready "$PR"
             exit 0
           fi
 
-          gh pr merge "$PR" --auto --squash
+          # Merge this reviewed commit only: a later push needs its own review.
           for _ in $(seq 1 110); do
             sleep 30
-            case "$(gh pr view "$PR" --json state --jq .state || true)" in
-              MERGED) gh workflow run docker-publish.yml --ref dev; exit 0 ;;
-              CLOSED) exit 0 ;;
+            read -r state head <<< "$(gh pr view "$PR" --json state,headRefOid \
+              --jq '"\(.state) \(.headRefOid)"' || true)"
+            [ "$state" = OPEN ] && [ "$head" = "$SHA" ] || exit 0
+            checks=$(gh pr checks "$PR" --required --json bucket \
+              --jq 'if any(.[]; .bucket == "fail") then "fail"
+                    elif length > 0 and all(.[]; .bucket == "pass" or .bucket == "skipping")
+                    then "pass"
+                    else "wait" end' || true)
+            case "$checks" in
+              fail) exit 0 ;;
+              pass)
+                if gh pr merge "$PR" --squash --match-head-commit "$SHA"; then
+                  gh workflow run docker-publish.yml --ref dev
+                  exit 0
+                fi ;;
             esac
-            failed=$(gh pr checks "$PR" --required --json bucket \
-              --jq 'any(.[]; .bucket == "fail")' || true)
-            if [ "$failed" = true ]; then exit 0; fi
           done
