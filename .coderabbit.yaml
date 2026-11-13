@@ -1,6 +1,7 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 #
-# CodeRabbit gives advice and auto-merge waits for its review; CI decides.
+# CodeRabbit gives advice; auto-merge of the maintainer's pull requests
+# waits for its review; CI decides.
 # Nothing here approves, requests changes or pushes code.
 
 language: fr-FR
@@ -17,8 +18,8 @@ reviews:
   collapse_walkthrough: true
   poem: false
   review_status: true
-  # The "CodeRabbit" check is required on dev: auto-merge waits for the
-  # review. An error ends it neutral, so it never blocks on its own.
+  # Auto-merge of the maintainer's pull requests waits for a completed
+  # review (see .github/workflows/dependabot-automerge.yml).
   review_progress: true
   fail_commit_status: false
   sequence_diagrams: false
@@ -46,13 +47,17 @@ reviews:
     base_branches:
       - "^main$"
       - "^dev$"
-    # Every pull request is reviewed, Dependabot ones included.
-    ignore_usernames: []
+    # Dependency bumps: the checks decide, and it spares the review quota.
+    ignore_usernames:
+      - "dependabot[bot]"
 
   path_filters:
+    # Lockfiles are reviewed: CodeRabbit skips them by default, and a
+    # dependency pull request would otherwise have nothing to review.
+    # These are the default patterns without "!", which only re-include.
+    - "**/*.sum"
+    - "**/package-lock.json"
     - "!web/static/vendor/**"
-    - "!tools/vendor/package-lock.json"
-    - "!go.sum"
     - "!web/static/fonts/**"
     - "!web/static/icons/*.png"
     - "!bin/**"
@@ -72,8 +77,8 @@ reviews:
           fichiers compose appartenant à root, et l'accès à Docker vaut déjà
           root ;
         - Dependabot quotidien sans délai d'attente, et fusion automatique dans
-          dev de toute PR dont les contrôles passent, majeures comprises :
-          choix du mainteneur ;
+          dev de toute PR dont les contrôles passent, majeures comprises ;
+          les PR Dependabot ne sont pas relues ici : choix du mainteneur ;
         - une dépendance montée à la dernière version publiée plutôt qu'à la
           plus petite qui corrige : règle du projet.
 

@@ -1,10 +1,12 @@
 name: Auto-merge
 
-# A pull request to dev from Dependabot or the maintainer merges by itself
-# once CodeRabbit has really reviewed its head commit and every required
-# check passes, whatever the kind of update. A skipped, rate-limited or
-# failed review asks CodeRabbit again once, later; the pull request stays
-# open until a real review. A failing check leaves it open too.
+# Pull requests to dev merge by themselves once every required check
+# passes, whatever the kind of update:
+# - Dependabot ones on the checks alone (CodeRabbit ignores them);
+# - the maintainer's ones only after CodeRabbit has really reviewed the
+#   head commit. A skipped, rate-limited or failed review asks CodeRabbit
+#   again once, later; the pull request stays open until a real review.
+# A failing check leaves the pull request open.
 #
 # Dependabot security updates always target main: they are moved to dev,
 # never merged into main.
@@ -14,7 +16,7 @@ name: Auto-merge
 
 on:
   pull_request:
-    branches: [main]
+    branches: [dev, main]
   check_run:
     types: [completed]
 
@@ -22,12 +24,16 @@ permissions:
   contents: read
 
 jobs:
-  to-dev:
+  bot:
     if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 60
+    concurrency:
+      group: automerge-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     permissions:
       actions: write
+      contents: write
       pull-requests: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -35,9 +41,25 @@ jobs:
       PR: ${{ github.event.pull_request.number }}
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
     steps:
-      - run: |
+      - name: Move a security update to dev
+        if: github.base_ref == 'main'
+        run: |
           gh pr edit "$PR" --base dev
           gh workflow run ci.yml --ref "$HEAD_REF"
+
+      - name: Merge when green, then publish
+        run: |
+          gh pr merge "$PR" --auto --squash
+          for _ in $(seq 1 110); do
+            sleep 30
+            case "$(gh pr view "$PR" --json state --jq .state || true)" in
+              MERGED) gh workflow run docker-publish.yml --ref dev; exit 0 ;;
+              CLOSED) exit 0 ;;
+            esac
+            failed=$(gh pr checks "$PR" --required --json bucket \
+              --jq 'any(.[]; .bucket == "fail")' || true)
+            if [ "$failed" = true ]; then exit 0; fi
+          done
 
   merge:
     if: >-
@@ -66,25 +88,44 @@ jobs:
           read -r base author head <<< "$(gh pr view "$PR" --json baseRefName,author,headRefOid \
             --jq '"\(.baseRefName) \(.author.login) \(.headRefOid)"')"
           [ "$base" = dev ] && [ "$head" = "$SHA" ] || exit 0
-          [ "$author" = app/dependabot ] || [ "$author" = "$OWNER" ] || exit 0
+          [ "$author" = "$OWNER" ] || exit 0
 
           if [ "$CONCLUSION" != success ] || ! grep -q 'Review completed' <<< "$SUMMARY"; then
-            # No real review of this commit: ask again once, later.
-            mark="Revue CodeRabbit redemandée pour ${SHA:0:7}"
+            # No real review of this commit: ask again once per pull request,
+            # later. CodeRabbit ignores commands from bots and draft toggles,
+            # but reviews new commits: push an empty one, then run CI on it
+            # (a push made with GITHUB_TOKEN starts no workflow).
+            mark="Revue CodeRabbit redemandée"
             gh pr view "$PR" --json comments --jq '.comments[].body' | grep -qF "$mark" && exit 0
             sleep 900
-            gh pr comment "$PR" --body "@coderabbitai review"$'\n\n'"$mark"
+            [ "$(gh pr view "$PR" --json headRefOid --jq .headRefOid)" = "$SHA" ] || exit 0
+            branch=$(gh pr view "$PR" --json headRefName --jq .headRefName)
+            tree=$(gh api "repos/$GH_REPO/git/commits/$SHA" --jq .tree.sha)
+            new=$(gh api "repos/$GH_REPO/git/commits" -f message="chore: ask CodeRabbit to review again" \
+              -f tree="$tree" -f "parents[]=$SHA" --jq .sha)
+            gh api -X PATCH "repos/$GH_REPO/git/refs/heads/$branch" -f sha="$new" >/dev/null
+            gh workflow run ci.yml --ref "$branch"
+            gh pr comment "$PR" --body "$mark (${SHA:0:7} non relu)."
             exit 0
           fi
 
-          gh pr merge "$PR" --auto --squash
+          # Merge this reviewed commit only: a later push needs its own review.
           for _ in $(seq 1 110); do
             sleep 30
-            case "$(gh pr view "$PR" --json state --jq .state || true)" in
-              MERGED) gh workflow run docker-publish.yml --ref dev; exit 0 ;;
-              CLOSED) exit 0 ;;
+            read -r state head <<< "$(gh pr view "$PR" --json state,headRefOid \
+              --jq '"\(.state) \(.headRefOid)"' || true)"
+            [ "$state" = OPEN ] && [ "$head" = "$SHA" ] || exit 0
+            checks=$(gh pr checks "$PR" --required --json bucket \
+              --jq 'if any(.[]; .bucket == "fail") then "fail"
+                    elif length > 0 and all(.[]; .bucket == "pass" or .bucket == "skipping")
+                    then "pass"
+                    else "wait" end' || true)
+            case "$checks" in
+              fail) exit 0 ;;
+              pass)
+                if gh pr merge "$PR" --squash --match-head-commit "$SHA"; then
+                  gh workflow run docker-publish.yml --ref dev
+                  exit 0
+                fi ;;
             esac
-            failed=$(gh pr checks "$PR" --required --json bucket \
-              --jq 'any(.[]; .bucket == "fail")' || true)
-            if [ "$failed" = true ]; then exit 0; fi
           done
