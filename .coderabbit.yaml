@@ -1,0 +1,200 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit gives advice; CI (build, race tests, lint, govulncheck, Trivy,
+# vendored bundles) and the maintainer decide. Nothing here approves, blocks
+# a merge or pushes code.
+
+language: fr-FR
+tone_instructions: >-
+  Français, tutoiement, concis : le problème, sa conséquence concrète, la
+  correction proposée. Pas de compliments ni de résumé de ce qui va bien.
+
+reviews:
+  profile: chill
+  # Never approve or request changes: a Dependabot pull request that passes
+  # the required checks on dev is merged automatically and must stay so.
+  auto_approvals:
+    enabled: false
+  high_level_summary: true
+  collapse_walkthrough: true
+  poem: false
+  review_status: true
+  # The "CodeRabbit" status is not a required check; an error never fails it.
+  fail_commit_status: false
+  sequence_diagrams: false
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+  in_progress_fortune: false
+  # Advice only: no generated commits.
+  finishing_touches:
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    # main (the default branch) is always reviewed; dev is where work lands.
+    base_branches:
+      - "^main$"
+      - "^dev$"
+    # Dependabot pull requests are reviewed too: nobody is ignored.
+    ignore_usernames: []
+
+  path_filters:
+    - "!web/static/vendor/**"
+    - "!tools/vendor/package-lock.json"
+    - "!go.sum"
+    - "!web/static/fonts/**"
+    - "!web/static/icons/*.png"
+    - "!bin/**"
+    - "!**/*.test"
+
+  path_instructions:
+    - path: "**"
+      instructions: |
+        Dépôt public. Signaler tout secret, mot de passe, jeton, clé, adresse
+        e-mail personnelle, IP ou nom de domaine privé, y compris dans les
+        tests et la doc : les tests utilisent des valeurs factices
+        (user@example.com, clés marquées « gitleaks:allow »).
+        Assumé, ne pas re-signaler :
+        - l'API /api/status et /api/updates/check hors du proxy
+          d'authentification : c'est voulu, chaque route exige sa propre clé ;
+        - `user: "0:0"` dans le compose d'exemple : dockerr doit écrire des
+          fichiers compose appartenant à root, et l'accès à Docker vaut déjà
+          root ;
+        - Dependabot quotidien sans délai d'attente et fusion automatique des
+          montées mineures et correctives : choix du mainteneur ;
+        - une dépendance montée à la dernière version publiée plutôt qu'à la
+          plus petite qui corrige : règle du projet.
+
+    - path: "**/*.go"
+      instructions: |
+        Go 1.27, bibliothèque standard d'abord. Erreurs enveloppées avec
+        `fmt.Errorf("contexte : %w", err)`. Messages destinés à l'utilisateur
+        en français, commentaires du code en anglais. Tests table-driven ;
+        toute logique de `network_mode: container:`/`service:` a un cas dans
+        internal/netdeps. Signaler une nouvelle dépendance sans justification.
+
+    - path: "internal/auth/**"
+      instructions: |
+        L'utilisateur vient de l'en-tête du proxy d'authentification
+        (Remote-User), accepté seulement depuis DOCKERR_TRUSTED_PROXIES ; les
+        requêtes qui modifient l'état doivent rester same-origin. Toute
+        brèche dans ces deux règles est critique.
+
+    - path: "internal/server/**"
+      instructions: |
+        Les en-têtes de sécurité sont posés dans le code : CSP stricte
+        (scripts 'self' seulement, object-src 'none', frame-ancestors 'none',
+        styles inline uniquement avec le nonce de la réponse),
+        Permissions-Policy, X-Frame-Options DENY, nosniff. Assumé : seule la
+        page du terminal autorise 'unsafe-inline' pour les styles, car
+        xterm.js ne sait pas porter de nonce. Les valeurs de secrets et de
+        variables sensibles ne doivent jamais être rendues dans une page :
+        elles se chargent sur clic, et chaque révélation est journalisée. Les
+        clés d'API se comparent en temps constant sur leur SHA-256.
+
+    - path: "internal/stacks/**"
+      instructions: |
+        Toute écriture reste dans le dossier de la pile ; un chemin qui en
+        sort, lien symbolique compris, est refusé. Mode et propriétaire se
+        posent sur le fichier temporaire ouvert, avant le rename, jamais par
+        chemin. Assumé : les secrets sont en 0600 et donnés à l'UID du
+        conteneur, car Compose monte un secret fichier tel quel et ignore
+        uid/gid/mode hors Swarm.
+
+    - path: "internal/composeedit/**"
+      instructions: |
+        Les éditions graphiques modifient l'arbre YAML et doivent garder
+        commentaires et ancres ; un nœud ancré, aliasé ou sous une clé de
+        fusion `<<` reste en lecture seule (ErrLocked).
+
+    - path: "web/static/js/**"
+      instructions: |
+        JavaScript sans framework ni dépendance. CSP stricte : aucun style ni
+        script inline, styles posés en CSSOM (`el.style`), aucune donnée
+        externe dans innerHTML (construire le DOM ou utiliser textContent).
+
+    - path: "web/templates/**"
+      instructions: |
+        html/template : aucun attribut style, aucun script inline. Textes en
+        français, sans surtitres ni texte d'aide superflu.
+
+    - path: "web/static/css/**"
+      instructions: |
+        Une seule feuille ; couleurs en jetons (variables CSS) pour les thèmes
+        clair et sombre. Assumé : polices Inter Tight et JetBrains Mono,
+        hébergées par l'application.
+
+    - path: ".github/workflows/**"
+      instructions: |
+        Chaque `uses:` est épinglé sur un SHA de commit complet avec la
+        version en commentaire. Permissions minimales par job. Une release
+        n'est publiée que si la CI passe.
+
+    - path: "Dockerfile"
+      instructions: |
+        Images de base épinglées par digest ; image finale distroless, sans
+        shell, non-root par défaut.
+
+  tools:
+    # Already blocking in CI: running them here again only adds noise.
+    golangci-lint:
+      enabled: false
+    trivy:
+      enabled: false
+    osvScanner:
+      enabled: false
+    # Not run in CI, useful here.
+    actionlint:
+      enabled: true
+    zizmor:
+      enabled: true
+    hadolint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    gitleaks:
+      enabled: true
+    yamllint:
+      enabled: true
+    github-checks:
+      enabled: true
+    # No ESLint/Biome setup for the small vanilla JS; English and French
+    # mix in docs make LanguageTool and markdownlint noisy.
+    eslint:
+      enabled: false
+    biome:
+      enabled: false
+    languagetool:
+      enabled: false
+    markdownlint:
+      enabled: false
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+  learnings:
+    scope: local
+  issues:
+    scope: local
+  pull_requests:
+    scope: local
