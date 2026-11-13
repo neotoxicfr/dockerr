@@ -91,15 +91,21 @@ jobs:
           [ "$author" = "$OWNER" ] || exit 0
 
           if [ "$CONCLUSION" != success ] || ! grep -q 'Review completed' <<< "$SUMMARY"; then
-            # No real review of this commit: ask again once, later.
-            # CodeRabbit ignores commands from bots; it does review a pull
-            # request that becomes ready for review.
-            mark="Revue CodeRabbit redemandée pour ${SHA:0:7}"
+            # No real review of this commit: ask again once per pull request,
+            # later. CodeRabbit ignores commands from bots and draft toggles,
+            # but reviews new commits: push an empty one, then run CI on it
+            # (a push made with GITHUB_TOKEN starts no workflow).
+            mark="Revue CodeRabbit redemandée"
             gh pr view "$PR" --json comments --jq '.comments[].body' | grep -qF "$mark" && exit 0
             sleep 900
-            gh pr comment "$PR" --body "$mark"
-            gh pr ready "$PR" --undo
-            gh pr ready "$PR"
+            [ "$(gh pr view "$PR" --json headRefOid --jq .headRefOid)" = "$SHA" ] || exit 0
+            branch=$(gh pr view "$PR" --json headRefName --jq .headRefName)
+            tree=$(gh api "repos/$GH_REPO/git/commits/$SHA" --jq .tree.sha)
+            new=$(gh api "repos/$GH_REPO/git/commits" -f message="chore: ask CodeRabbit to review again" \
+              -f tree="$tree" -f "parents[]=$SHA" --jq .sha)
+            gh api -X PATCH "repos/$GH_REPO/git/refs/heads/$branch" -f sha="$new" >/dev/null
+            gh workflow run ci.yml --ref "$branch"
+            gh pr comment "$PR" --body "$mark (${SHA:0:7} non relu)."
             exit 0
           fi
 
