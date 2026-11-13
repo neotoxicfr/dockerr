@@ -1,10 +1,12 @@
 name: Auto-merge
 
-# A pull request to dev from Dependabot or the maintainer merges by itself
-# once CodeRabbit has really reviewed its head commit and every required
-# check passes, whatever the kind of update. A skipped, rate-limited or
-# failed review asks CodeRabbit again once, later; the pull request stays
-# open until a real review. A failing check leaves it open too.
+# Pull requests to dev merge by themselves once every required check
+# passes, whatever the kind of update:
+# - Dependabot ones on the checks alone (CodeRabbit ignores them);
+# - the maintainer's ones only after CodeRabbit has really reviewed the
+#   head commit. A skipped, rate-limited or failed review asks CodeRabbit
+#   again once, later; the pull request stays open until a real review.
+# A failing check leaves the pull request open.
 #
 # Dependabot security updates always target main: they are moved to dev,
 # never merged into main.
@@ -14,7 +16,7 @@ name: Auto-merge
 
 on:
   pull_request:
-    branches: [main]
+    branches: [dev, main]
   check_run:
     types: [completed]
 
@@ -22,12 +24,16 @@ permissions:
   contents: read
 
 jobs:
-  to-dev:
+  bot:
     if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 60
+    concurrency:
+      group: automerge-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     permissions:
       actions: write
+      contents: write
       pull-requests: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -35,9 +41,25 @@ jobs:
       PR: ${{ github.event.pull_request.number }}
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
     steps:
-      - run: |
+      - name: Move a security update to dev
+        if: github.base_ref == 'main'
+        run: |
           gh pr edit "$PR" --base dev
           gh workflow run ci.yml --ref "$HEAD_REF"
+
+      - name: Merge when green, then publish
+        run: |
+          gh pr merge "$PR" --auto --squash
+          for _ in $(seq 1 110); do
+            sleep 30
+            case "$(gh pr view "$PR" --json state --jq .state || true)" in
+              MERGED) gh workflow run docker-publish.yml --ref dev; exit 0 ;;
+              CLOSED) exit 0 ;;
+            esac
+            failed=$(gh pr checks "$PR" --required --json bucket \
+              --jq 'any(.[]; .bucket == "fail")' || true)
+            if [ "$failed" = true ]; then exit 0; fi
+          done
 
   merge:
     if: >-
@@ -66,7 +88,7 @@ jobs:
           read -r base author head <<< "$(gh pr view "$PR" --json baseRefName,author,headRefOid \
             --jq '"\(.baseRefName) \(.author.login) \(.headRefOid)"')"
           [ "$base" = dev ] && [ "$head" = "$SHA" ] || exit 0
-          [ "$author" = app/dependabot ] || [ "$author" = "$OWNER" ] || exit 0
+          [ "$author" = "$OWNER" ] || exit 0
 
           if [ "$CONCLUSION" != success ] || ! grep -q 'Review completed' <<< "$SUMMARY"; then
             # No real review of this commit: ask again once, later.
