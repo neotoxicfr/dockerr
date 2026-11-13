@@ -14,7 +14,7 @@ require (
 	github.com/moby/moby/client v0.6.2
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/sirupsen/logrus v1.10.2
-	go.yaml.in/yaml/v4 v4.0.0-rc.6
+	go.yaml.in/yaml/v4 v4.0.0
 	golang.org/x/sync v0.25.0
 	modernc.org/sqlite v1.61.1
 )
