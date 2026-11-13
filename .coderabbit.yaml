@@ -50,9 +50,12 @@ reviews:
     ignore_usernames: []
 
   path_filters:
+    # Lockfiles are reviewed: CodeRabbit skips them by default, and a
+    # dependency pull request would otherwise have nothing to review.
+    # These are the default patterns without "!", which only re-include.
+    - "**/*.sum"
+    - "**/package-lock.json"
     - "!web/static/vendor/**"
-    - "!tools/vendor/package-lock.json"
-    - "!go.sum"
     - "!web/static/fonts/**"
     - "!web/static/icons/*.png"
     - "!bin/**"
