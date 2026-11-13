@@ -9,10 +9,10 @@ require (
 	github.com/compose-spec/compose-go/v2 v2.16.2
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v29.9.3+incompatible
-	github.com/docker/compose/v5 v5.7.0
-	github.com/moby/moby/api v1.56.1
-	github.com/moby/moby/client v0.6.2
-	github.com/pressly/goose/v3 v3.30.0
+	github.com/docker/compose/v5 v5.7.1
+	github.com/moby/moby/api v1.57.0
+	github.com/moby/moby/client v0.6.3
+	github.com/pressly/goose/v3 v3.30.1
 	github.com/sirupsen/logrus v1.10.2
 	go.yaml.in/yaml/v4 v4.0.0
 	golang.org/x/sync v0.25.0
@@ -66,7 +66,7 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-runewidth v0.0.31 // indirect
 	github.com/mattn/go-shellwords v1.0.16 // indirect
-	github.com/mfridman/interpolate v0.0.2 // indirect
+	github.com/mfridman/interpolate v0.2.0 // indirect
 	github.com/moby/buildkit v0.33.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.3.3 // indirect
