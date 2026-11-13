@@ -1,8 +1,7 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 #
-# CodeRabbit gives advice; CI (build, race tests, lint, govulncheck, Trivy,
-# vendored bundles) and the maintainer decide. Nothing here approves, blocks
-# a merge or pushes code.
+# CodeRabbit gives advice and auto-merge waits for its review; CI decides.
+# Nothing here approves, requests changes or pushes code.
 
 language: fr-FR
 tone_instructions: >-
@@ -18,7 +17,9 @@ reviews:
   collapse_walkthrough: true
   poem: false
   review_status: true
-  # The "CodeRabbit" status is not a required check; an error never fails it.
+  # The "CodeRabbit" check is required on dev: auto-merge waits for the
+  # review. An error ends it neutral, so it never blocks on its own.
+  review_progress: true
   fail_commit_status: false
   sequence_diagrams: false
   suggested_reviewers: false
@@ -45,9 +46,8 @@ reviews:
     base_branches:
       - "^main$"
       - "^dev$"
-    # Bot pull requests: the checks decide, no review.
-    ignore_usernames:
-      - "dependabot[bot]"
+    # Every pull request is reviewed, Dependabot ones included.
+    ignore_usernames: []
 
   path_filters:
     - "!web/static/vendor/**"
