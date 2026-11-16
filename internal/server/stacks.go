@@ -95,10 +95,11 @@ type homeData struct {
 	LastCheck                          time.Time
 	Checking                           bool
 	Err                                string
+	CanCreate                          bool // the host's stacks folder is mounted
 }
 
 func (s *Server) homeData(ctx context.Context) homeData {
-	var d homeData
+	d := homeData{CanCreate: s.stacks.Dir != ""}
 	_, list, err := s.snapshot(ctx)
 	if err != nil {
 		d.Err = err.Error()
@@ -179,7 +180,7 @@ func (s *Server) stackData(r *http.Request, st *stacks.Stack, all []*stacks.Cont
 		snap := op.Snapshot()
 		d.Op = &snap
 	}
-	if names, err := s.store.AutoUpdates(r.Context()); err == nil {
+	if names, err := s.store.AutoUpdates(r.Context(), s.storeHost()); err == nil {
 		d.AutoUpdate = slices.Contains(names, st.Name)
 	} else {
 		d.AutoUnknown = true
@@ -225,9 +226,9 @@ func (s *Server) stackPage(w http.ResponseWriter, r *http.Request) {
 	d.EditorMode = s.editorMode(r)
 	switch d.Tab {
 	case "history":
-		d.Versions, _ = s.store.Versions(r.Context(), st.Name)
+		d.Versions, _ = s.store.Versions(r.Context(), s.histKey(st.Name))
 	case "ops":
-		d.Ops, _ = s.store.Ops(r.Context(), st.Name, 100)
+		d.Ops, _ = s.store.Ops(r.Context(), s.storeHost(), st.Name, 100)
 	}
 	s.render(w, r, "stack", st.Name, "stacks", d)
 }
@@ -260,13 +261,16 @@ func (s *Server) stackOp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	caps := s.docker.Caps
-	switch kind {
-	case ops.Stop, ops.Restart:
+	// Without a compose file, start only starts the containers there are
+	// (no up): the lifecycle rights are enough, as for stop and restart.
+	startOnly := kind == ops.Start && st.File == ""
+	switch {
+	case kind == ops.Stop || kind == ops.Restart || startOnly:
 		if !caps.Lifecycle {
 			jsonError(w, http.StatusForbidden, "le proxy Docker refuse l'arrêt et le démarrage (ALLOW_START, ALLOW_STOP, ALLOW_RESTARTS)")
 			return
 		}
-	case ops.Repair:
+	case kind == ops.Repair:
 		if !caps.Lifecycle {
 			jsonError(w, http.StatusForbidden, "le proxy Docker refuse les redémarrages")
 			return
@@ -469,8 +473,8 @@ func (s *Server) saveFiles(ctx context.Context, st *stacks.Stack, composeText, e
 		return err
 	}
 	for _, v := range []store.Version{
-		{Stack: st.Name, File: "compose", Content: oldC, Author: "disque", Note: "état sur le disque"},
-		{Stack: st.Name, File: "env", Content: oldE, Author: "disque", Note: "état sur le disque"},
+		{Stack: s.histKey(st.Name), File: "compose", Content: oldC, Author: "disque", Note: "état sur le disque"},
+		{Stack: s.histKey(st.Name), File: "env", Content: oldE, Author: "disque", Note: "état sur le disque"},
 	} {
 		if v.File == "env" && v.Content == "" {
 			continue
@@ -482,11 +486,11 @@ func (s *Server) saveFiles(ctx context.Context, st *stacks.Stack, composeText, e
 	if err := st.WriteFiles(composeText, envText); err != nil {
 		return err
 	}
-	if err := s.store.SaveVersion(ctx, store.Version{Stack: st.Name, File: "compose", Content: composeText, Author: user, Note: note}); err != nil {
+	if err := s.store.SaveVersion(ctx, store.Version{Stack: s.histKey(st.Name), File: "compose", Content: composeText, Author: user, Note: note}); err != nil {
 		return err
 	}
 	if envText != "" || oldE != "" {
-		return s.store.SaveVersion(ctx, store.Version{Stack: st.Name, File: "env", Content: envText, Author: user, Note: note})
+		return s.store.SaveVersion(ctx, store.Version{Stack: s.histKey(st.Name), File: "env", Content: envText, Author: user, Note: note})
 	}
 	return nil
 }
@@ -509,7 +513,7 @@ func (s *Server) stackVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	v, err := s.store.Version(r.Context(), st.Name, id)
+	v, err := s.store.Version(r.Context(), s.histKey(st.Name), id)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -529,7 +533,7 @@ func (s *Server) stackRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	v, err := s.store.Version(r.Context(), st.Name, id)
+	v, err := s.store.Version(r.Context(), s.histKey(st.Name), id)
 	if err != nil {
 		jsonError(w, http.StatusNotFound, "version introuvable")
 		return
@@ -609,9 +613,9 @@ func (s *Server) createStack(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	_ = s.store.SaveVersion(r.Context(), store.Version{Stack: b.Name, File: "compose", Content: b.Compose, Author: user, Note: "création"})
+	_ = s.store.SaveVersion(r.Context(), store.Version{Stack: s.histKey(b.Name), File: "compose", Content: b.Compose, Author: user, Note: "création"})
 	if b.Env != "" {
-		_ = s.store.SaveVersion(r.Context(), store.Version{Stack: b.Name, File: "env", Content: b.Env, Author: user, Note: "création"})
+		_ = s.store.SaveVersion(r.Context(), store.Version{Stack: s.histKey(b.Name), File: "env", Content: b.Env, Author: user, Note: "création"})
 	}
 	res := map[string]string{"url": "/s/" + b.Name}
 	if b.Start {
@@ -632,20 +636,18 @@ func (s *Server) createStack(w http.ResponseWriter, r *http.Request) {
 // --- settings ---
 
 type settingsData struct {
-	Host, DaemonVersion, APIVersion string
-	Caps                            []capView
-	LastCheck                       time.Time
-	Checking                        bool
-	ExecEnabled                     bool
-	ExecLog                         []store.ExecEntry
-	StacksDir                       string
-	RecentOps                       []store.Operation
-	Notify                          []string // notification channels in use
-	Alerts                          []store.LogAlert
-	StackNames                      []string
-	AutoAt                          string   // daily time of automatic updates
-	AutoStacks                      []string // stacks opted in, by setting or label
-	AutoUnknown                     bool     // the opt-ins could not be read
+	Hosts       []hostView
+	LastCheck   time.Time
+	Checking    bool
+	ExecEnabled bool
+	ExecLog     []store.ExecEntry
+	RecentOps   []store.Operation
+	Notify      []string // notification channels in use
+	Alerts      []store.LogAlert
+	StackNames  []string
+	AutoAt      string   // daily time of automatic updates
+	AutoStacks  []string // stacks opted in, by setting or label
+	AutoUnknown bool     // the opt-ins could not be read
 }
 
 type capView struct {
@@ -654,20 +656,14 @@ type capView struct {
 }
 
 func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
-	d := settingsData{Host: s.docker.Host, ExecEnabled: s.cfg.ExecEnabled, StacksDir: s.cfg.StacksDir}
-	if v, err := s.docker.API.ServerVersion(r.Context(), client.ServerVersionOptions{}); err == nil {
-		d.DaemonVersion, d.APIVersion = v.Version, v.APIVersion
-	}
-	for _, c := range s.docker.Caps.List() {
-		d.Caps = append(d.Caps, capView{c.Name, c.Env, c.OK})
-	}
+	d := settingsData{Hosts: s.hostViews(r, true), ExecEnabled: s.cfg.ExecEnabled}
 	d.LastCheck, d.Checking = s.updates.LastRun()
 	d.ExecLog, _ = s.store.ExecLog(r.Context(), 20)
-	d.RecentOps, _ = s.store.Ops(r.Context(), "", 10)
+	d.RecentOps, _ = s.store.Ops(r.Context(), "", "", 10)
 	d.Notify = s.notifier.Targets()
 	d.Alerts, _ = s.store.LogAlerts(r.Context())
 	d.AutoAt = fmt.Sprintf("%02d:%02d", s.cfg.AutoUpdateHour, s.cfg.AutoUpdateMinute)
-	opted, err := s.store.AutoUpdates(r.Context())
+	opted, err := s.store.AutoUpdates(r.Context(), s.storeHost())
 	d.AutoUnknown = err != nil
 	if _, list, err := s.snapshot(r.Context()); err == nil {
 		for _, st := range list {
@@ -701,6 +697,9 @@ func (s *Server) setMode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) portHost(r *http.Request) string {
+	if s.cur.PortHost != "" {
+		return s.cur.PortHost
+	}
 	if s.cfg.PortHost != "" {
 		return s.cfg.PortHost
 	}
@@ -712,7 +711,7 @@ func (s *Server) portHost(r *http.Request) string {
 }
 
 func (s *Server) operations(w http.ResponseWriter, r *http.Request) {
-	list, err := s.store.Ops(r.Context(), "", 300)
+	list, err := s.store.Ops(r.Context(), "", "", 300)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

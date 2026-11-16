@@ -4,7 +4,7 @@
   <div class="bar-actions">
     <label class="search"><svg class="i s"><use href="#i-search"/></svg><span class="sr">Rechercher</span><input type="search" id="q" placeholder="Rechercher" autocomplete="off"></label>
     <button class="btn icon ghost" data-check-updates title="Vérifier les mises à jour{{if not $d.LastCheck.IsZero}} · dernière vérification {{since $d.LastCheck}}{{end}}" aria-label="Vérifier les mises à jour"><svg class="i"><use href="#i-restart"/></svg></button>
-    <a class="btn primary" href="/new"><svg class="i s"><use href="#i-plus"/></svg><span>Nouvelle pile</span></a>
+    {{if $d.CanCreate}}<a class="btn primary" href="/new"><svg class="i s"><use href="#i-plus"/></svg><span>Nouvelle pile</span></a>{{end}}
   </div>
 </header>
 <div class="filters"><div class="seg" role="tablist" id="filters">

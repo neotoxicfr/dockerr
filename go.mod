@@ -11,6 +11,7 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v29.9.3+incompatible
 	github.com/docker/compose/v5 v5.7.1
+	github.com/docker/go-connections v0.8.2
 	github.com/moby/moby/api v1.57.0
 	github.com/moby/moby/client v0.6.3
 	github.com/pressly/goose/v3 v3.30.1
@@ -40,7 +41,6 @@ require (
 	github.com/containerd/ttrpc v1.2.9 // indirect
 	github.com/containerd/typeurl/v2 v2.3.0 // indirect
 	github.com/docker/docker-credential-helpers v0.9.9 // indirect
-	github.com/docker/go-connections v0.8.2 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/docker/secrets-engine/client v0.2.2 // indirect
 	github.com/docker/secrets-engine/x v0.8.5 // indirect

@@ -48,6 +48,11 @@ type Config struct {
 	// AutoUpdateHour and AutoUpdateMinute are the daily time (hour, minute; container local time)
 	// when opted-in stacks are updated.
 	AutoUpdateHour, AutoUpdateMinute int
+
+	// HostName names the Docker host of DOCKER_HOST and StacksDir.
+	HostName string
+	// Hosts are the other Docker hosts, from DOCKERR_HOSTS.
+	Hosts []Host
 }
 
 // ParseClock reads "HH:MM" (24 h).
@@ -79,6 +84,7 @@ func Load() (*Config, error) {
 		NtfyURL:        os.Getenv("DOCKERR_NTFY_URL"),
 		NtfyToken:      os.Getenv("DOCKERR_NTFY_TOKEN"),
 		WebhookURL:     os.Getenv("DOCKERR_WEBHOOK_URL"),
+		HostName:       env("DOCKERR_HOST_NAME", "local"),
 	}
 	var err error
 	// A token file keeps the secret out of the container's environment.
@@ -106,6 +112,12 @@ func Load() (*Config, error) {
 		} else {
 			c.TrustedHosts = append(c.TrustedHosts, s)
 		}
+	}
+	if !hostNameRe.MatchString(c.HostName) {
+		return nil, fmt.Errorf("DOCKERR_HOST_NAME %q : lettres minuscules, chiffres, - et _", c.HostName)
+	}
+	if c.Hosts, err = parseHosts(os.Getenv, c.HostName); err != nil {
+		return nil, err
 	}
 	if !c.InsecureNoAuth && len(c.TrustedProxies) == 0 && len(c.TrustedHosts) == 0 {
 		return nil, fmt.Errorf("DOCKERR_TRUSTED_PROXIES est requis : l'adresse ou le nom du proxy d'authentification (ex. traefik)")

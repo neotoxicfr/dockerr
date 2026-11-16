@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 
@@ -175,9 +176,12 @@ func (e *Events) Notify() {
 
 func (e *Events) Loop(ctx context.Context) {
 	backoff := time.Second
+	// Docker replays events since a time: from the loop's start, then from
+	// the last one seen, nothing is lost while (re)subscribing.
+	since := time.Now()
 	for ctx.Err() == nil {
 		f := make(client.Filters).Add("type", "container", "image", "network", "volume")
-		res := e.api.Events(ctx, client.EventsListOptions{Filters: f})
+		res := e.api.Events(ctx, client.EventsListOptions{Filters: f, Since: strconv.FormatInt(since.Unix(), 10)})
 		start := time.Now()
 	read:
 		for {
@@ -185,6 +189,9 @@ func (e *Events) Loop(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case m := <-res.Messages:
+				if t := time.Unix(0, m.TimeNano); m.TimeNano > 0 && t.After(since) {
+					since = t
+				}
 				// exec_* and top events fire constantly and change nothing visible.
 				// So do the file browser's reads and writes, and its helper containers.
 				if a := string(m.Action); len(a) >= 5 && a[:5] == "exec_" || a == "top" ||

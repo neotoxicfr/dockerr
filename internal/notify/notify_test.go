@@ -50,6 +50,12 @@ func TestSend(t *testing.T) {
 	if hook.path != "/hook" || hook.body["event"] != Died || hook.body["stack"] != "web" || hook.auth != "" {
 		t.Errorf("webhook = %+v (no token to the webhook)", hook)
 	}
+	if err := n.Send(context.Background(), Event{Kind: Died, Title: "web s'est arrêté", Host: "pi"}); err != nil {
+		t.Fatal(err)
+	}
+	if h := hits(); len(h) != 4 || h[2].body["title"] != "pi · web s'est arrêté" || h[3].body["host"] != "pi" {
+		t.Errorf("host not named: %+v", h[2:])
+	}
 }
 
 func TestNotifyQuiet(t *testing.T) {

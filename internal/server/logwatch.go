@@ -187,7 +187,7 @@ func (s *Server) watchOne(ctx context.Context, id, name, stack string, rules []m
 				if len(msg) > 300 {
 					msg = msg[:300] + "…"
 				}
-				s.notifier.Notify(notify.Event{Kind: notify.LogAlert, Stack: stack, Container: name, Priority: 4,
+				s.notify(notify.Event{Kind: notify.LogAlert, Stack: stack, Container: name, Priority: 4,
 					Title: "Alerte logs : " + name, Message: msg})
 				break
 			}
@@ -236,9 +236,14 @@ func (s *Server) alertDelete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
+// nudgeAlerts wakes the log watcher of every connected host.
 func (s *Server) nudgeAlerts() {
-	select {
-	case s.alertsNudge <- struct{}{}:
-	default:
+	for _, h := range s.hosts {
+		if srv := h.srv.Load(); srv != nil {
+			select {
+			case srv.alertsNudge <- struct{}{}:
+			default:
+			}
+		}
 	}
 }

@@ -194,6 +194,16 @@ svg.i.s { width: 15px; height: 15px; }
 .nav-link:hover { background: var(--surface-2); color: var(--text); }
 .nav-link[aria-current="page"] { background: var(--accent-soft); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent-line); }
 .nav-link[aria-current="page"] svg { color: var(--accent); }
+.host-pick {
+  position: relative; display: flex; align-items: center; gap: 9px; min-height: var(--tap); padding: 0 11px; margin-bottom: 10px;
+  border: 1px solid var(--line); border-radius: 10px; color: var(--text); font-weight: 500;
+  transition: background-color var(--t), border-color var(--t);
+}
+.host-pick:hover { background: var(--surface-2); }
+.host-pick:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.host-pick .host-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.host-pick .chev { transform: rotate(90deg); color: var(--faint); }
+.host-pick select { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; opacity: 0; cursor: pointer; }
 .side .grow { flex: 1; }
 .side .who { display: flex; align-items: center; gap: 9px; padding: 8px 11px; color: var(--faint); font-size: var(--fs-s); overflow: hidden; }
 .side .who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -216,6 +226,13 @@ svg.i.s { width: 15px; height: 15px; }
   }
   .tabbar .nav-link[aria-current="page"] { background: var(--accent-soft); color: var(--accent-text); box-shadow: none; }
   .tabbar svg.i { width: 21px; height: 21px; }
+  .tabbar .host-pick {
+    flex: 1; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; min-height: 0; padding: 0 4px; margin: 0;
+    border: 0; border-radius: 14px; color: var(--muted); font-size: 11px;
+  }
+  .tabbar .host-pick .host-name { flex: none; max-width: 100%; }
+  .tabbar .host-pick .chev { display: none; }
+  .tabbar .host-pick .dot { position: absolute; top: 7px; left: calc(50% + 7px); }
 }
 
 /* ---- En-tête de page ------------------------------------------------------------------- */
@@ -543,6 +560,7 @@ a.chip:hover { border-color: var(--accent-line); color: var(--text); }
 .op-tasks li.error { color: var(--danger); }
 .op-tasks li.warning { color: var(--warn); }
 .section .btn { margin-left: 8px; vertical-align: middle; }
+.section .dot { margin-right: 9px; vertical-align: middle; }
 
 .history { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
 .versions { padding: 5px; }

@@ -119,6 +119,15 @@ shows who rides on whom.
   exec: volumes go through a short-lived, never started `busybox:1.37` helper
   container (pulled when missing), and every write is logged.
 
+### Several hosts
+
+- **More Docker hosts** over TCP (a socket proxy or the daemon itself, TLS
+  recommended): pick one in the sidebar, its state shown; an unreachable host
+  never slows the others. Settings list each host's endpoint and probed
+  rights, and warn about plain TCP. Without its stacks folder mounted, a
+  remote host's stacks are found from their containers and can be started,
+  stopped and restarted, not edited or updated.
+
 ### Everywhere
 
 - Light and dark themes, built for phone and desktop alike.
@@ -200,6 +209,11 @@ Each stack is a folder under `DOCKERR_STACKS_DIR` holding `compose.yaml`,
 | `DOCKERR_NTFY_TOKEN` / `DOCKERR_NTFY_TOKEN_FILE` | — | ntfy access token, or a file holding it |
 | `DOCKERR_WEBHOOK_URL` | — | URL receiving each notification as JSON |
 | `DOCKERR_API_KEYS_FILE` | — | SHA-256 hashes of the keys allowed to read `GET /api/status` or `GET /metrics`, or to start a check (see below) |
+| `DOCKERR_HOST_NAME` | `local` | name of the `DOCKER_HOST` host, when there are several |
+| `DOCKERR_HOSTS` | — | other hosts, e.g. `pi=tcp://pi.example:2376,nas2=tcp://nas2.example:2375` |
+| `DOCKERR_TLS_<NAME>_DIR` | `DOCKER_CERT_PATH` | folder with `ca.pem`, `cert.pem`, `key.pem` for that host; none: plain TCP |
+| `DOCKERR_STACKS_DIR_<NAME>` | — | that host's stacks folder, mounted at the same path as on the host (e.g. NFS) |
+| `DOCKERR_PORT_HOST_<NAME>` | URL host | host used in links to that host's published ports |
 | `DOCKERR_DATA_DIR` | `/data` | SQLite database: history, preferences, terminal log |
 | `DOCKERR_LISTEN` | `:8080` | |
 | `DOCKERR_INSECURE_NOAUTH` | `false` | no authentication, local development only |

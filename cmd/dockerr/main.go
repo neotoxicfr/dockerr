@@ -50,50 +50,27 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	d, err := docker.New(ctx)
-	if err != nil {
-		return err
-	}
 	st, err := store.Open(ctx, cfg.DataDir)
 	if err != nil {
 		return err
 	}
 	defer st.Close()
-
-	mgr := stacks.NewManager(d, cfg.StacksDir)
-	runner := ops.NewRunner(mgr, cfg.RepairNetDeps)
-	events := docker.NewEvents(d.API)
-	creds := func(host string) (string, string) {
-		key := host
-		if host == "docker.io" {
-			key = "https://index.docker.io/v1/"
-		}
-		a, err := d.CLI.ConfigFile().GetAuthConfig(key)
-		if err != nil {
-			return "", ""
-		}
-		return a.Username, a.Password
-	}
-	upd := updates.New(d.API, creds)
 	notifier, err := notify.New(cfg.NtfyURL, cfg.NtfyToken, cfg.WebhookURL)
 	if err != nil {
 		return err
 	}
-	runner.OnDone = func(o ops.Snapshot) {
-		events.Notify()
-		notifyOp(notifier, o)
-		rec := store.Operation{ID: o.ID, Stack: o.Stack, Service: o.Service, Kind: string(o.Kind), User: o.User,
-			Started: o.Started, Ended: o.Ended, Err: o.Err}
-		for _, t := range o.Tasks {
-			rec.Tasks = append(rec.Tasks, store.OpTask{ID: t.ID, Text: t.Text, Details: t.Details, Status: t.Status})
-		}
-		if err := st.SaveOp(context.Background(), rec); err != nil {
-			slog.Warn("operation not recorded", "stack", o.Stack, "err", err)
-		}
-	}
 
-	srv, err := server.New(server.Deps{Config: cfg, Docker: d, Stacks: mgr, Runner: runner, Store: st,
-		Updates: upd, Stats: docker.NewStats(d.API), Events: events, Notify: notifier})
+	multi := len(cfg.Hosts) > 0
+	hosts := []server.HostDeps{{Name: cfg.HostName, StacksDir: cfg.StacksDir,
+		Connect: connect(cfg, st, notifier, config.Host{Name: cfg.HostName, StacksDir: cfg.StacksDir}, "", multi)}}
+	for _, h := range cfg.Hosts {
+		if h.TLSDir == "" {
+			slog.Warn("docker host over plain TCP: anyone on the network path is root on it, use TLS", "host", h.Name, "endpoint", h.URL)
+		}
+		hosts = append(hosts, server.HostDeps{Name: h.Name, Endpoint: h.URL, TLS: h.TLSDir != "", StacksDir: h.StacksDir,
+			PortHost: h.PortHost, Connect: connect(cfg, st, notifier, h, h.Name, multi)})
+	}
+	srv, err := server.New(ctx, server.Deps{Config: cfg, Store: st, Notify: notifier, Hosts: hosts})
 	if err != nil {
 		return err
 	}
@@ -105,7 +82,7 @@ func run() error {
 		BaseContext: func(net.Listener) context.Context { return ctx }}
 	errc := make(chan error, 1)
 	go func() { errc <- hs.ListenAndServe() }()
-	slog.Info("dockerr listening", "addr", cfg.Listen, "stacks", cfg.StacksDir, "version", server.Version)
+	slog.Info("dockerr listening", "addr", cfg.Listen, "stacks", cfg.StacksDir, "hosts", len(hosts), "version", server.Version)
 	select {
 	case err := <-errc:
 		if !errors.Is(err, http.ErrServerClosed) {
@@ -144,14 +121,59 @@ func healthcheck() int {
 	return 0
 }
 
+// connect returns what builds a host's daemon client, stacks, runner and
+// loops. record is the host as operations are recorded ("" = local);
+// multi: notifications name the host.
+func connect(cfg *config.Config, st *store.Store, notifier *notify.Notifier, h config.Host, record string, multi bool) func(context.Context) (*server.Bundle, error) {
+	return func(ctx context.Context) (*server.Bundle, error) {
+		d, err := docker.New(ctx, h.URL, h.TLSDir)
+		if err != nil {
+			return nil, err
+		}
+		mgr := stacks.NewManager(d, h.StacksDir)
+		mgr.Remote = h.URL != ""
+		runner := ops.NewRunner(mgr, cfg.RepairNetDeps)
+		events := docker.NewEvents(d.API)
+		creds := func(host string) (string, string) {
+			key := host
+			if host == "docker.io" {
+				key = "https://index.docker.io/v1/"
+			}
+			a, err := d.CLI.ConfigFile().GetAuthConfig(key)
+			if err != nil {
+				return "", ""
+			}
+			return a.Username, a.Password
+		}
+		label := ""
+		if multi {
+			label = h.Name
+		}
+		runner.OnDone = func(o ops.Snapshot) {
+			events.Notify()
+			notifyOp(notifier, label, o)
+			rec := store.Operation{ID: o.ID, Host: record, Stack: o.Stack, Service: o.Service, Kind: string(o.Kind), User: o.User,
+				Started: o.Started, Ended: o.Ended, Err: o.Err}
+			for _, t := range o.Tasks {
+				rec.Tasks = append(rec.Tasks, store.OpTask{ID: t.ID, Text: t.Text, Details: t.Details, Status: t.Status})
+			}
+			if err := st.SaveOp(context.Background(), rec); err != nil {
+				slog.Warn("operation not recorded", "stack", o.Stack, "err", err)
+			}
+		}
+		return &server.Bundle{Docker: d, Stacks: mgr, Runner: runner, Updates: updates.New(d.API, creds),
+			Stats: docker.NewStats(d.API), Events: events}, nil
+	}
+}
+
 // notifyOp reports a failed operation, and the shared networks it repaired.
-func notifyOp(n *notify.Notifier, o ops.Snapshot) {
+func notifyOp(n *notify.Notifier, host string, o ops.Snapshot) {
 	what := o.Stack
 	if o.Service != "" {
 		what = o.Stack + " · " + o.Service
 	}
 	if o.Err != "" {
-		n.Notify(notify.Event{Kind: notify.OpFailed, Stack: o.Stack, Container: o.Service, Priority: 4,
+		n.Notify(notify.Event{Kind: notify.OpFailed, Host: host, Stack: o.Stack, Container: o.Service, Priority: 4,
 			Title: "Échec : " + strings.ToLower(o.Label) + " · " + what, Message: o.Err + " (par " + o.User + ")"})
 	}
 	var fixed []string
@@ -161,7 +183,7 @@ func notifyOp(n *notify.Notifier, o ops.Snapshot) {
 		}
 	}
 	if len(fixed) > 0 {
-		n.Notify(notify.Event{Kind: notify.Repaired, Stack: o.Stack, Priority: 3,
+		n.Notify(notify.Event{Kind: notify.Repaired, Host: host, Stack: o.Stack, Priority: 3,
 			Title: "Réseau partagé réparé : " + o.Stack, Message: strings.Join(fixed, ", ") + " a retrouvé son réseau."})
 	}
 }
