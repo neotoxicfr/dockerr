@@ -46,7 +46,7 @@
 {{if eq $d.Tab "networks"}}
 {{if not $caps.Networks}}<div class="error-box">Le proxy Docker refuse l'accès aux réseaux (NETWORKS=1).</div>{{else}}
 <div class="fitbox">
-<div class="section-bar"><span class="grow"></span><button class="btn" data-prune="networks" data-confirm="Supprimer les réseaux qu'aucun conteneur n'utilise ?">Supprimer les inutilisés</button></div>
+<div class="section-bar"><span class="grow"></span><button class="btn" data-net-new><svg class="i s"><use href="#i-plus"/></svg>Nouveau réseau</button><button class="btn" data-prune="networks" data-confirm="Supprimer les réseaux qu'aucun conteneur n'utilise ?">Supprimer les inutilisés</button></div>
 <div class="table-wrap"><table class="nettable" data-filterable>
   <thead><tr><th class="tg"></th><th>Réseau</th><th>Pilote</th><th>Sous-réseau</th><th>Passerelle</th><th class="num">Conteneurs</th><th>Pile</th></tr></thead>
   {{range $i, $n := $d.Networks}}
@@ -63,12 +63,13 @@
   <tr class="det" id="nd{{$i}}" hidden><td colspan="7">
     <div class="netdet">
       {{if .Members}}<table class="inner">
-        <thead><tr><th>Conteneur</th><th>IPv4</th><th>IPv6</th><th>MAC</th></tr></thead>
+        <thead><tr><th>Conteneur</th><th>IPv4</th><th>IPv6</th><th>MAC</th><th></th></tr></thead>
         <tbody>{{range .Members}}<tr>
           <td>{{if .C}}<a class="cell-name" href="/c/{{short .C.ID}}"><span class="dot {{ctrClass .C}}"></span>{{.Name}}</a>{{else}}{{.Name}}{{end}}</td>
           <td class="mono">{{if .IPv4}}{{.IPv4}}{{else}}<span class="faint">—</span>{{end}}</td>
           <td class="mono">{{if .IPv6}}{{.IPv6}}{{else}}<span class="faint">—</span>{{end}}</td>
           <td class="mono faint">{{.MAC}}</td>
+          <td class="num">{{if not (eq $n.Name "host" "none")}}<button class="btn ghost sm" data-net-disconnect="{{$n.ID}}" data-container="{{.Name}}">Déconnecter</button>{{end}}</td>
         </tr>{{end}}</tbody>
       </table>{{else}}<p class="faint">Aucun conteneur.</p>{{end}}
       <dl class="facts">
@@ -82,12 +83,52 @@
       {{if .Options}}<details class="opts"><summary>Options du pilote ({{len .Options}})</summary><dl class="facts">
         {{range .Options}}<div><dt>{{.K}}</dt><dd>{{.V}}</dd></div>{{end}}
       </dl></details>{{end}}
+      <div class="net-actions">
+        {{if not (eq .Name "host" "none")}}<button class="btn sm" data-net-connect="{{.ID}}" data-name="{{.Name}}"><svg class="i s"><use href="#i-link"/></svg>Connecter un conteneur</button>{{end}}
+        {{if .Editable}}
+        <button class="btn sm" data-net-edit="{{.ID}}" data-name="{{.Name}}" data-driver="{{.Driver}}" data-parent="{{.Parent}}" data-subnet="{{.Subnet4.K}}" data-gateway="{{.Subnet4.V}}" data-ipv6="{{if .IPv6}}1{{end}}" data-subnet6="{{.Subnet6}}" data-internal="{{if .Internal}}1{{end}}"><svg class="i s"><use href="#i-edit"/></svg>Modifier</button>
+        <button class="btn sm danger" data-net-remove="{{.ID}}" data-name="{{.Name}}"><svg class="i s"><use href="#i-trash"/></svg>Supprimer</button>
+        {{else if .Project}}<span class="faint small">Géré par la pile {{.Project}} : se modifie dans son compose.</span>
+        {{else if .Members}}<span class="faint small">Pour le modifier ou le supprimer, déconnecte d'abord ses conteneurs.</span>{{end}}
+      </div>
     </div>
   </td></tr>
   </tbody>
   {{end}}
 </table></div>
 </div>
+<dialog id="net-dlg">
+  <form method="dialog" id="net-form">
+    <div class="dlg-body">
+      <h2>Nouveau réseau</h2>
+      <p class="net-warn" hidden>Docker ne modifie pas un réseau : il sera supprimé puis recréé avec ces réglages.</p>
+      <div class="field"><label for="nf-name">Nom</label><input id="nf-name" name="name" required maxlength="63" pattern="[A-Za-z0-9][A-Za-z0-9_.\-]*" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div class="field"><label for="nf-driver">Pilote</label><select id="nf-driver" name="driver"><option value="bridge">bridge</option><option value="macvlan">macvlan</option><option value="ipvlan">ipvlan</option></select></div>
+      <div class="field" data-for-parent hidden><label for="nf-parent">Interface de l'hôte</label><input id="nf-parent" name="parent" placeholder="eth0" autocomplete="off" spellcheck="false"></div>
+      <div class="field-row">
+        <div class="field"><label for="nf-subnet">Sous-réseau IPv4</label><input id="nf-subnet" name="subnet" placeholder="automatique, ex. 172.30.0.0/24" autocomplete="off" spellcheck="false" class="mono"></div>
+        <div class="field"><label for="nf-gateway">Passerelle</label><input id="nf-gateway" name="gateway" placeholder="automatique" autocomplete="off" spellcheck="false" class="mono"></div>
+      </div>
+      <label class="check-line"><input type="checkbox" name="ipv6" id="nf-ipv6"> IPv6</label>
+      <div class="field" data-for-ipv6 hidden><label for="nf-subnet6">Sous-réseau IPv6</label><input id="nf-subnet6" name="subnet6" placeholder="automatique, ex. fd00:30::/64" autocomplete="off" spellcheck="false" class="mono"></div>
+      <label class="check-line"><input type="checkbox" name="internal"> Interne (sans accès extérieur)</label>
+    </div>
+    <div class="dlg-foot"><button class="btn" value="cancel" formnovalidate>Annuler</button><button class="btn primary" value="ok">Créer</button></div>
+  </form>
+</dialog>
+<dialog id="net-conn">
+  <form method="dialog" id="net-conn-form">
+    <div class="dlg-body">
+      <h2>Connecter à <span class="net-name"></span></h2>
+      <p>Hors compose : non reporté dans le fichier de la pile, perdu si le conteneur est recréé.</p>
+      <div class="field"><label for="nc-ctr">Conteneur</label><select id="nc-ctr" name="container" required>{{range $d.CtrNames}}<option>{{.}}</option>{{end}}</select></div>
+      <div class="field"><label for="nc-ip">Adresse IPv4</label><input id="nc-ip" name="ipv4" placeholder="automatique" autocomplete="off" spellcheck="false" class="mono"></div>
+      <div class="field"><label for="nc-alias">Alias DNS</label><input id="nc-alias" name="aliases" placeholder="séparés par des virgules" autocomplete="off" spellcheck="false"></div>
+    </div>
+    <div class="dlg-foot"><button class="btn" value="cancel" formnovalidate>Annuler</button><button class="btn primary" value="ok">Connecter</button></div>
+  </form>
+</dialog>
+<script type="module" src="/static/js/networks.js?v={{.Version}}"></script>
 {{end}}{{end}}
 
 {{if eq $d.Tab "volumes"}}
