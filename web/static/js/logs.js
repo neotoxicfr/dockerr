@@ -37,13 +37,15 @@ function ansi(text) {
 }
 
 const plain = (m) => m.replace(SGR, "").replace(OTHER, "");
+// One formatter for every line: toLocaleTimeString builds one per call.
+const clock = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 function lineEl(l) {
   const el = document.createElement("div");
   el.className = "ln" + (l.e ? " err" : "");
   const time = document.createElement("span");
   time.className = "t";
-  time.textContent = l.t ? new Date(l.t).toLocaleTimeString("fr-FR") : "";
+  time.textContent = l.t ? clock.format(new Date(l.t)) : "";
   el.append(time);
   if (multi) {
     const n = document.createElement("span");
@@ -53,6 +55,8 @@ function lineEl(l) {
   }
   const msg = document.createElement("span");
   msg.className = "m";
+  // Most lines have no colour and no search: their text, without a span each.
+  if (!query && !l.m.includes("\x1b")) { msg.textContent = l.m; el.append(msg); return el; }
   for (const [txt, c] of ansi(l.m)) {
     const s = document.createElement("span");
     if (c.fg) s.classList.add(c.fg);
@@ -125,6 +129,8 @@ function connect() {
   const since = $("#lg-since").value;
   if (since === "all") q.set("tail", "all");
   else if (since) q.set("since", since);
+  // A stack's history: about 1500 lines in all, not 300 per container.
+  else if (sel.length > 1) q.set("tail", Math.max(50, Math.floor(1500 / sel.length)));
   // The server numbers containers in request order: map back to ours.
   const index = sel.map((s) => s.i);
   es = new EventSource("/logs/stream?" + q);
