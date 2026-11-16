@@ -3,6 +3,7 @@ package docker
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"time"
@@ -41,14 +42,16 @@ func StreamLogs(ctx context.Context, api client.APIClient, id string, idx int, t
 	go func() { done <- scanLines(ctx, outR, idx, false, out) }()
 	go func() { done <- scanLines(ctx, errR, idx, true, out) }()
 	_, err = stdcopy.StdCopy(outW, errW, rc)
-	outW.Close()
-	errW.Close()
-	<-done
-	<-done
+	_ = outW.Close() // a pipe writer's Close never fails
+	_ = errW.Close()
+	scanOut, scanErr := <-done, <-done
 	if ctx.Err() != nil {
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return errors.Join(scanOut, scanErr)
 }
 
 func scanLines(ctx context.Context, r io.Reader, idx int, stderr bool, out chan<- LogLine) error {
