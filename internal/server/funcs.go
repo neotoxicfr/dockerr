@@ -18,6 +18,7 @@ var funcs = template.FuncMap{
 	"cpu":     func(f float64) string { return fmt.Sprintf("%.1f %%", f) },
 	"since":   since,
 	"logName": logName,
+	"isSelf":  isSelf,
 	"opLabel": func(k string) string { return ops.Labels[ops.Kind(k)] },
 	// newTag swaps the tag of an image reference: nginx:1.27, 1.29 → nginx:1.29.
 	"newTag": func(ref, tag string) string {

@@ -52,11 +52,10 @@ func (s *Server) snapshot(ctx context.Context) ([]*stacks.Container, []*stacks.S
 	if err != nil {
 		return nil, nil, err
 	}
-	self, _ := os.Hostname()
 	for _, st := range list {
 		for _, svc := range st.Services {
 			for _, c := range svc.Containers {
-				if len(self) >= 12 && strings.HasPrefix(c.ID, self) {
+				if isSelf(c) {
 					st.Self = true
 				}
 				st.CPU += c.CPU
@@ -694,4 +693,11 @@ func (s *Server) operations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, r, "operations", "Opérations", "settings", list)
+}
+
+// isSelf reports dockerr's own container: in Docker, the host name is
+// the container ID's prefix.
+func isSelf(c *stacks.Container) bool {
+	self, _ := os.Hostname()
+	return len(self) >= 12 && strings.HasPrefix(c.ID, self)
 }
