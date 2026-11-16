@@ -71,19 +71,18 @@ func New(ntfyURL, ntfyToken, webhook string) (*Notifier, error) {
 
 func (n *Notifier) Enabled() bool { return n != nil && (n.ntfyURL != "" || n.webhook != "") }
 
-// Targets names the channels in use, for the settings page: server and
-// topic, never the token.
+// Targets names the channels in use, for the settings page: the server
+// only. A public ntfy topic and a webhook path work as passwords.
 func (n *Notifier) Targets() []string {
 	var out []string
 	if n == nil {
 		return out
 	}
-	if n.ntfyURL != "" {
-		out = append(out, "ntfy · "+n.ntfyURL)
-	}
-	if n.webhook != "" {
-		p, _ := url.Parse(n.webhook)
-		out = append(out, "webhook · "+p.Scheme+"://"+p.Host)
+	for _, t := range [][2]string{{"ntfy", n.ntfyURL}, {"webhook", n.webhook}} {
+		if t[1] != "" {
+			p, _ := url.Parse(t[1])
+			out = append(out, t[0]+" · "+p.Scheme+"://"+p.Host)
+		}
 	}
 	return out
 }
@@ -159,7 +158,13 @@ func (n *Notifier) post(ctx context.Context, u string, body any, token string) e
 	}
 	res, err := n.client.Do(req)
 	if err != nil {
-		return err
+		// The URL may carry a secret (a webhook token, an ntfy topic): name
+		// the host only, in logs and on the page.
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			return fmt.Errorf("%s : %w", req.URL.Host, ue.Err)
+		}
+		return fmt.Errorf("%s : échec de l'envoi", req.URL.Host)
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {

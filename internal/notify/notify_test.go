@@ -91,3 +91,19 @@ func TestNew(t *testing.T) {
 		t.Error("nil notifier must be off")
 	}
 }
+
+func TestNoSecretInErrorsOrTargets(t *testing.T) {
+	n, err := New("http://127.0.0.1:1/s3cret-topic", "tk", "http://127.0.0.1:1/hooks/s3cret-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = n.Send(context.Background(), Event{Kind: Test})
+	if err == nil || strings.Contains(err.Error(), "s3cret") {
+		t.Fatalf("error leaks the URL: %v", err)
+	}
+	for _, s := range n.Targets() {
+		if strings.Contains(s, "s3cret") {
+			t.Errorf("target leaks the URL: %s", s)
+		}
+	}
+}
