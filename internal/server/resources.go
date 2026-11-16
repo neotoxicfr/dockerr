@@ -53,9 +53,9 @@ type networkRow struct {
 	// declared by a compose file, no container on it).
 	Editable  bool
 	Removable bool // Editable, whatever the driver
-	Subnet4   kv // first IPv4 subnet → gateway, to prefill the form
-	Subnet6  string
-	Parent   string // host interface of a macvlan or ipvlan network
+	Subnet4   kv   // first IPv4 subnet → gateway, to prefill the form
+	Subnet6   string
+	Parent    string // host interface of a macvlan or ipvlan network
 }
 
 // netMember is a container's endpoint on a network.
