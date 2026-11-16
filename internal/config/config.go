@@ -45,6 +45,21 @@ type Config struct {
 	// RepairNetDeps recreates containers left without a network namespace
 	// after an operation (network_mode: container:/service:).
 	RepairNetDeps bool
+	// AutoUpdateHour and AutoUpdateMinute are the daily time (hour, minute; container local time)
+	// when opted-in stacks are updated.
+	AutoUpdateHour, AutoUpdateMinute int
+}
+
+// ParseClock reads "HH:MM" (24 h).
+func ParseClock(s string) (hour, minute int, err error) {
+	h, m, ok := strings.Cut(strings.TrimSpace(s), ":")
+	if hour, err = strconv.Atoi(h); !ok || err != nil || len(h) != 2 || hour < 0 || hour > 23 {
+		return 0, 0, fmt.Errorf("%q n'est pas une heure HH:MM", s)
+	}
+	if minute, err = strconv.Atoi(m); err != nil || len(m) != 2 || minute < 0 || minute > 59 {
+		return 0, 0, fmt.Errorf("%q n'est pas une heure HH:MM", s)
+	}
+	return hour, minute, nil
 }
 
 func Load() (*Config, error) {
@@ -76,6 +91,9 @@ func Load() (*Config, error) {
 	}
 	if c.UpdateInterval, err = time.ParseDuration(env("DOCKERR_UPDATE_INTERVAL", "6h")); err != nil {
 		return nil, fmt.Errorf("DOCKERR_UPDATE_INTERVAL: %w", err)
+	}
+	if c.AutoUpdateHour, c.AutoUpdateMinute, err = ParseClock(env("DOCKERR_AUTOUPDATE_AT", "04:00")); err != nil {
+		return nil, fmt.Errorf("DOCKERR_AUTOUPDATE_AT: %w", err)
 	}
 	// Who may set the auth header: IPs, CIDRs, or host names resolved on the
 	// fly (e.g. "traefik" on a Docker network). No default: anything else on

@@ -18,14 +18,15 @@ import (
 
 // Event kinds.
 const (
-	Died      = "container_died"
-	OOM       = "container_oom"
-	Unhealthy = "container_unhealthy"
-	Update    = "update_available"
-	OpFailed  = "operation_failed"
-	Repaired  = "network_repaired"
-	LogAlert  = "log_alert"
-	Test      = "test"
+	Died       = "container_died"
+	OOM        = "container_oom"
+	Unhealthy  = "container_unhealthy"
+	Update     = "update_available"
+	OpFailed   = "operation_failed"
+	Repaired   = "network_repaired"
+	LogAlert   = "log_alert"
+	AutoUpdate = "auto_update"
+	Test       = "test"
 )
 
 type Event struct {

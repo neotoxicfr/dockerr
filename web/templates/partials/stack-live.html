@@ -39,6 +39,12 @@
   {{else}}{{template "service-card" dict "S" $svc "C" nil "D" $d "Adv" $adv "Caps" $caps}}{{end}}
 {{end}}
 </div>
+{{if and $st.File (not $st.Self)}}
+<div class="setting auto-update">
+  <div class="txt"><strong>Mise à jour automatique</strong><span>Chaque jour à {{$d.AutoAt}}, si une image a changé{{if $d.AutoLabel}} · activée aussi par le label <code>dockerr.autoupdate</code>{{end}}</span></div>
+  <label class="switch"><input type="checkbox" {{if $d.AutoUpdate}}checked{{end}} data-autoupdate="{{$st.Name}}" aria-label="Mise à jour automatique"><span></span></label>
+</div>
+{{end}}
 {{end}}
 {{end}}
 
