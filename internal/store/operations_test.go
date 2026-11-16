@@ -7,35 +7,46 @@ import (
 )
 
 func TestOpCounts(t *testing.T) {
-	ctx := context.Background()
-	s, err := Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
 	now := time.Now()
-	for _, o := range []Operation{
-		{ID: "1", Stack: "a", Kind: "update", Started: now, Ended: now},
-		{ID: "2", Stack: "b", Kind: "update", Started: now, Ended: now},
-		{ID: "3", Stack: "b", Kind: "update", Started: now, Ended: now, Err: "boom"},
-		{ID: "4", Stack: "b", Kind: "stop", Started: now, Ended: now},
-	} {
-		if err := s.SaveOp(ctx, o); err != nil {
-			t.Fatal(err)
-		}
+	cases := []struct {
+		name string
+		ops  []Operation
+		want []OpCount
+	}{
+		{"empty", nil, nil},
+		{"by kind and result", []Operation{
+			{ID: "1", Stack: "a", Kind: "update", Started: now, Ended: now},
+			{ID: "2", Stack: "b", Kind: "update", Started: now, Ended: now},
+			{ID: "3", Stack: "b", Kind: "update", Started: now, Ended: now, Err: "boom"},
+			{ID: "4", Stack: "b", Kind: "stop", Started: now, Ended: now},
+		}, []OpCount{{"stop", false, 1}, {"update", false, 2}, {"update", true, 1}}},
 	}
-	got, err := s.OpCounts(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []OpCount{{"stop", false, 1}, {"update", false, 2}, {"update", true, 1}}
-	if len(got) != len(want) {
-		t.Fatalf("%v, want %v", got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("%d: %v, want %v", i, got[i], want[i])
-		}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := context.Background()
+			s, err := Open(ctx, t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			for _, o := range c.ops {
+				if err := s.SaveOp(ctx, o); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got, err := s.OpCounts(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != len(c.want) {
+				t.Fatalf("%v, want %v", got, c.want)
+			}
+			for i := range c.want {
+				if got[i] != c.want[i] {
+					t.Errorf("%d: %v, want %v", i, got[i], c.want[i])
+				}
+			}
+		})
 	}
 }
 

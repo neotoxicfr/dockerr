@@ -1,28 +1,23 @@
 package server
 
 import (
-	"os"
+	"strings"
 	"testing"
-
-	"github.com/neotoxicfr/dockerr/internal/stacks"
 )
 
-func TestIsSelf(t *testing.T) {
-	host, _ := os.Hostname()
-	if len(host) < 12 {
-		t.Skip("host name too short to be a container ID")
-	}
+func TestContainerIDFromMountinfo(t *testing.T) {
+	id := strings.Repeat("ab12", 16)
 	cases := []struct {
-		id   string
-		want bool
+		name, in, want string
 	}{
-		{host + "0123456789abcdef", true},
-		{"ffffffffffff" + host, false},
-		{"", false},
+		{"docker hostname mount", "1234 1200 8:1 /var/lib/docker/containers/" + id + "/hostname /etc/hostname rw,relatime - ext4 /dev/sda1 rw", id},
+		{"custom data root", "88 70 0:45 /containers/" + id + "/resolv.conf /etc/resolv.conf rw - xfs /dev/x rw", id},
+		{"not a container", "22 1 8:1 / / rw,relatime - ext4 /dev/sda1 rw", ""},
+		{"short id ignored", "5 1 8:1 /containers/abc123/hostname /etc/hostname rw - ext4 /dev/sda1 rw", ""},
 	}
 	for _, c := range cases {
-		if got := isSelf(&stacks.Container{ID: c.id}); got != c.want {
-			t.Errorf("isSelf(%q) = %v, want %v", c.id, got, c.want)
+		if got := containerIDFromMountinfo(c.in); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
 		}
 	}
 }
