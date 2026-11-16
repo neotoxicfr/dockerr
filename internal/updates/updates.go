@@ -55,20 +55,6 @@ func (c *Checker) Get(ref string) (Result, bool) {
 	return r, ok
 }
 
-// WaitIdle waits until no check runs; false if ctx ended first.
-func (c *Checker) WaitIdle(ctx context.Context) bool {
-	for {
-		if _, running := c.LastRun(); !running {
-			return true
-		}
-		select {
-		case <-ctx.Done():
-			return false
-		case <-time.After(time.Second):
-		}
-	}
-}
-
 func (c *Checker) LastRun() (time.Time, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -83,13 +69,44 @@ func Checkable(ref string) bool {
 
 // Check refreshes the given references, four at a time.
 func (c *Checker) Check(ctx context.Context, refs []string) {
-	c.mu.Lock()
-	if c.running {
-		c.mu.Unlock()
+	if !c.begin(ctx, false) {
 		return
 	}
-	c.running = true
-	c.mu.Unlock()
+	c.run(ctx, refs)
+}
+
+// CheckWhenIdle waits for a check in progress to end, then runs its own:
+// waiting and starting are one step, no other check slips in between.
+func (c *Checker) CheckWhenIdle(ctx context.Context, refs []string) bool {
+	if !c.begin(ctx, true) {
+		return false
+	}
+	c.run(ctx, refs)
+	return true
+}
+
+// begin marks a check as running; wait: until the current one ends.
+func (c *Checker) begin(ctx context.Context, wait bool) bool {
+	for {
+		c.mu.Lock()
+		if !c.running {
+			c.running = true
+			c.mu.Unlock()
+			return true
+		}
+		c.mu.Unlock()
+		if !wait {
+			return false
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+func (c *Checker) run(ctx context.Context, refs []string) {
 	defer func() {
 		c.mu.Lock()
 		c.running, c.last = false, time.Now()

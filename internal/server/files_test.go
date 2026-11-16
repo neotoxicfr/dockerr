@@ -315,3 +315,21 @@ func TestFilesTemplate(t *testing.T) {
 		}
 	}
 }
+
+func TestSensitiveFile(t *testing.T) {
+	cases := map[string]bool{
+		"/run/secrets/db_password": true,
+		"/app/.env":                true,
+		"/certs/server.key":        true,
+		"/certs/ca.PEM":            true,
+		"/etc/app/api_token.txt":   true,
+		"/etc/hostname":            false,
+		"/var/log/app.log":         false,
+		"/app/config.yaml":         false,
+	}
+	for p, want := range cases {
+		if got := sensitiveFile(p); got != want {
+			t.Errorf("sensitiveFile(%q) = %v, want %v", p, got, want)
+		}
+	}
+}

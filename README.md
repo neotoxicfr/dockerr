@@ -257,7 +257,7 @@ setting to add.
 | `IMAGES`, `NETWORKS`, `VOLUMES`, `POST` | compose up, pull, down, cleanup |
 | `ALLOW_START`, `ALLOW_STOP`, `ALLOW_RESTARTS` | start, stop, restart, network repair |
 | `EXEC` | terminal |
-| `CONTAINERS`, `POST` (+ `VOLUMES`, `IMAGES` for volumes) | file browser: reading needs `CONTAINERS`, writing and volumes `POST` |
+| `CONTAINERS`, `NETWORKS`, `POST` (+ `VOLUMES`, `IMAGES` for volumes) | file browser: reading needs `CONTAINERS`; writing and volumes need the write rights (`POST`, with `NETWORKS`) |
 
 ## Development
 

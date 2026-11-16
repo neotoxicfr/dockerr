@@ -55,24 +55,45 @@ func TestTransientErrorIsNotNew(t *testing.T) {
 	}
 }
 
-func TestWaitIdle(t *testing.T) {
-	c := &Checker{results: map[string]Result{}}
-	if !c.WaitIdle(context.Background()) {
-		t.Fatal("idle checker must not wait")
+func TestCheckWhenIdle(t *testing.T) {
+	newChecker := func(running bool) *Checker {
+		c := &Checker{results: map[string]Result{}, running: running}
+		c.check = func(_ context.Context, ref string) Result { return Result{Ref: ref} }
+		return c
 	}
-	c.running = true
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	if c.WaitIdle(ctx) {
-		t.Fatal("a cancelled wait must report false")
+	cases := []struct {
+		name        string
+		running     bool          // a check already runs
+		endsAfter   time.Duration // when it ends (0: never)
+		cancelFirst bool
+		want        bool
+	}{
+		{"idle runs at once", false, 0, false, true},
+		{"waits for the running check", true, 300 * time.Millisecond, false, true},
+		{"cancelled while waiting", true, 0, true, false},
 	}
-	go func() {
-		time.Sleep(300 * time.Millisecond)
-		c.mu.Lock()
-		c.running = false
-		c.mu.Unlock()
-	}()
-	if !c.WaitIdle(context.Background()) {
-		t.Fatal("the wait must end when the check does")
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ch := newChecker(c.running)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if c.cancelFirst {
+				cancel()
+			}
+			if c.endsAfter > 0 {
+				go func() {
+					time.Sleep(c.endsAfter)
+					ch.mu.Lock()
+					ch.running = false
+					ch.mu.Unlock()
+				}()
+			}
+			if got := ch.CheckWhenIdle(ctx, []string{"a:1"}); got != c.want {
+				t.Fatalf("CheckWhenIdle = %v, want %v", got, c.want)
+			}
+			if _, ok := ch.Get("a:1"); ok != c.want {
+				t.Errorf("checked = %v, want %v", ok, c.want)
+			}
+		})
 	}
 }

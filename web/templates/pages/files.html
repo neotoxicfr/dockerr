@@ -32,7 +32,8 @@
     <div class="k">Droits</div><div class="mono">{{$f.Mode}}</div>
     <div class="k">Modifié</div><div>{{datetime $f.Mtime}}</div>
   </div>
-  {{if $f.Reason}}<p class="muted">{{$f.Reason}}</p>
+  {{if $f.Masked}}<p class="muted">Contenu sensible masqué. <a class="btn sm" href="?path={{urlquery $d.Path}}&amp;reveal=1">Afficher</a></p>
+  {{else if $f.Reason}}<p class="muted">{{$f.Reason}}</p>
   {{else}}
   <textarea id="fb-text" class="mono fb-text" spellcheck="false" autocapitalize="off" aria-label="Contenu de {{base $d.Path}}"{{if not $f.Editable}} readonly{{end}}{{if $f.CRLF}} data-crlf="1"{{end}}>
 {{$f.Text}}</textarea>
