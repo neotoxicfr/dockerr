@@ -113,6 +113,11 @@ shows who rides on whom.
   (sensitive ones fetched only when clicked), labels, raw inspect.
 - History of every saved compose and `.env`, with diff and one-click restore.
 - Container terminal, off by default, every session logged.
+- **File browser** for containers (running or stopped) and volumes: browse,
+  download a file or a folder (tar), edit a text file (up to 1 MiB, mode and
+  owner kept), upload files (up to 100 MiB). Through Docker's archive API, no
+  exec: volumes go through a short-lived, never started `busybox:1.37` helper
+  container (pulled when missing), and every write is logged.
 
 ### Everywhere
 
@@ -252,6 +257,7 @@ setting to add.
 | `IMAGES`, `NETWORKS`, `VOLUMES`, `POST` | compose up, pull, down, cleanup |
 | `ALLOW_START`, `ALLOW_STOP`, `ALLOW_RESTARTS` | start, stop, restart, network repair |
 | `EXEC` | terminal |
+| `CONTAINERS`, `POST` (+ `VOLUMES`, `IMAGES` for volumes) | file browser: reading needs `CONTAINERS`, writing and volumes `POST` |
 
 ## Development
 
