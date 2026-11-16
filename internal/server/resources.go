@@ -49,6 +49,12 @@ type networkRow struct {
 	Options                   []kv
 	Containers                []*stacks.Container
 	Members                   []netMember
+	// Editable: dockerr may recreate or remove it (not Docker's own, not
+	// declared by a compose file, no container on it).
+	Editable bool
+	Subnet4  kv // first IPv4 subnet → gateway, to prefill the form
+	Subnet6  string
+	Parent   string // host interface of a macvlan or ipvlan network
 }
 
 // netMember is a container's endpoint on a network.
@@ -71,6 +77,8 @@ type resourcesData struct {
 	Networks   []networkRow
 	Volumes    []volumeRow
 	Err        string
+	// CtrNames lists every container, for the network connect form.
+	CtrNames []string
 }
 
 func (s *Server) resources(w http.ResponseWriter, r *http.Request) {
@@ -96,6 +104,10 @@ func (s *Server) resources(w http.ResponseWriter, r *http.Request) {
 		d.Images, err = s.imageRows(ctx, all)
 	case "networks":
 		d.Networks, err = s.networkRows(ctx, all)
+		for _, c := range all {
+			d.CtrNames = append(d.CtrNames, c.Name)
+		}
+		sort.Strings(d.CtrNames)
 	case "volumes":
 		d.Volumes, err = s.volumeRows(ctx, all)
 	}
@@ -161,6 +173,11 @@ func (s *Server) networkRows(ctx context.Context, all []*stacks.Container) ([]ne
 				}
 				if sub != "" {
 					row.Subnets = append(row.Subnets, kv{sub, gw})
+					if cfg.Subnet.Addr().Is4() && row.Subnet4.K == "" {
+						row.Subnet4 = kv{sub, gw}
+					} else if cfg.Subnet.Addr().Is6() && row.Subnet6 == "" {
+						row.Subnet6 = sub
+					}
 				}
 			}
 			for k, v := range in.Network.Options {
@@ -178,7 +195,9 @@ func (s *Server) networkRows(ctx context.Context, all []*stacks.Container) ([]ne
 				row.Members = append(row.Members, m)
 			}
 			sort.Slice(row.Members, func(i, j int) bool { return row.Members[i].Name < row.Members[j].Name })
+			row.Parent = in.Network.Options["parent"]
 		}
+		row.Editable = !predefined[n.Name] && row.Project == "" && len(row.Members) == 0
 		out = append(out, row)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
