@@ -432,7 +432,6 @@ func isoDate(s string) string {
 	return t.Local().Format("02/01/2006 15:04:05")
 }
 
-
 // containerEnv returns one environment value, for the reveal button.
 func (s *Server) containerEnv(w http.ResponseWriter, r *http.Request) {
 	if !s.advancedOnly(w, r) {
