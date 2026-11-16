@@ -19,6 +19,7 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"os"
 	"path"
 	"regexp"
 	"sort"
@@ -32,6 +33,7 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/neotoxicfr/dockerr/internal/auth"
+	"github.com/neotoxicfr/dockerr/internal/stacks"
 )
 
 const (
@@ -206,10 +208,10 @@ func writeTar(w io.Writer, files []tarFile) error {
 		h := f.Header
 		h.Typeflag = tar.TypeReg
 		if err := tw.WriteHeader(&h); err != nil {
-			return err
+			return fmt.Errorf("archive de %s : %w", h.Name, err)
 		}
 		if _, err := io.Copy(tw, f.Body); err != nil {
-			return err
+			return fmt.Errorf("lecture de %s : %w", h.Name, err)
 		}
 	}
 	return tw.Close()
@@ -289,7 +291,13 @@ func (s *Server) openTarget(w http.ResponseWriter, r *http.Request, write bool) 
 	caps := s.docker.Caps
 	vol := r.PathValue("name")
 	if !caps.Containers || ((write || vol != "") && !caps.Write) {
-		fail(w, r, http.StatusForbidden, "le proxy Docker refuse cette action (CONTAINERS=1, POST=1)")
+		fail(w, r, http.StatusForbidden, "le proxy Docker refuse cette action (CONTAINERS=1, NETWORKS=1, POST=1)")
+		return nil, false
+	}
+	// A volume is read through a helper container: listing volumes, and
+	// pulling its image when missing, must be allowed too.
+	if vol != "" && (!caps.Volumes || !caps.Images) {
+		fail(w, r, http.StatusForbidden, "le proxy Docker refuse l'accès aux volumes (VOLUMES=1, IMAGES=1)")
 		return nil, false
 	}
 	if vol == "" {
@@ -377,6 +385,8 @@ func (s *Server) removeHelpers(ctx context.Context) {
 }
 
 type fileView struct {
+	// Masked: a secret-looking file, shown only on demand (and logged).
+	Masked   bool
 	Size     uint64
 	Mode     string
 	Mtime    time.Time
@@ -402,7 +412,7 @@ type filesData struct {
 func (s *Server) firstEntry(ctx context.Context, t *fileTarget, p string) (*tar.Header, *tar.Reader, io.ReadCloser, error) {
 	res, err := s.docker.API.CopyFromContainer(ctx, t.ctr, client.CopyFromContainerOptions{SourcePath: t.real(p)})
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("lecture de %s : %w", p, err)
 	}
 	tr := tar.NewReader(res.Content)
 	h, err := tr.Next()
@@ -447,7 +457,15 @@ func (s *Server) filesPage(w http.ResponseWriter, r *http.Request) {
 			d.Error = err.Error()
 		}
 	default:
+		reveal := r.URL.Query().Get("reveal") == "1"
+		if sensitiveFile(p) && !reveal {
+			d.File = &fileView{Masked: true, Size: uint64(max(st.Stat.Size, 0)), Mode: modeString(st.Stat.Mode), Mtime: st.Stat.Mtime}
+			break
+		}
 		d.File = s.fileView(ctx, t, p, st.Stat)
+		if sensitiveFile(p) {
+			slog.Info("file revealed", "user", auth.User(ctx), t.Kind, t.Name, "path", p)
+		}
 	}
 	title := t.Name
 	if p != "/" {
@@ -650,16 +668,23 @@ func (s *Server) filesUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var exists []string
+	existing := map[string]os.FileMode{} // replaced files keep their mode
 	for _, fh := range fhs {
 		st, err := s.docker.API.ContainerStatPath(ctx, t.ctr, client.ContainerStatPathOptions{Path: t.real(path.Join(dir, fh.Filename))})
-		if err != nil {
+		if err != nil && cerrdefs.IsNotFound(err) {
 			continue
+		}
+		if err != nil {
+			// Not knowing whether it exists must not skip the confirmation.
+			jsonError(w, http.StatusBadGateway, "état de "+fh.Filename+" illisible : "+err.Error())
+			return
 		}
 		if !st.Stat.Mode.IsRegular() {
 			jsonError(w, http.StatusConflict, "existe et n'est pas un fichier ordinaire : "+fh.Filename)
 			return
 		}
 		exists = append(exists, fh.Filename)
+		existing[fh.Filename] = st.Stat.Mode.Perm()
 	}
 	if len(exists) > 0 && r.URL.Query().Get("overwrite") != "1" {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": "fichiers existants", "exists": exists})
@@ -674,7 +699,15 @@ func (s *Server) filesUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer func() { _ = f.Close() }()
-		files = append(files, tarFile{tar.Header{Name: fh.Filename, Mode: 0o644, Uid: dh.Uid, Gid: dh.Gid, Size: fh.Size, ModTime: now}, f})
+		h := tar.Header{Name: fh.Filename, Mode: 0o644, Uid: dh.Uid, Gid: dh.Gid, Size: fh.Size, ModTime: now}
+		if m, ok := existing[fh.Filename]; ok {
+			h.Mode = int64(m)
+			if oh, _, body, err := s.firstEntry(ctx, t, path.Join(dir, fh.Filename)); err == nil {
+				h.Uid, h.Gid = oh.Uid, oh.Gid // and their owner
+				_ = body.Close()
+			}
+		}
+		files = append(files, tarFile{h, f})
 	}
 	pr, pw := io.Pipe()
 	go func() { _ = pw.CloseWithError(writeTar(pw, files)) }()
@@ -688,4 +721,19 @@ func (s *Server) filesUpload(w http.ResponseWriter, r *http.Request) {
 		slog.Info("file uploaded", "user", auth.User(ctx), t.Kind, t.Name, "path", path.Join(dir, fh.Filename), "bytes", fh.Size)
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// sensitiveFile: the content of these files stays hidden until asked for,
+// like secrets elsewhere in dockerr.
+func sensitiveFile(p string) bool {
+	if strings.HasPrefix(p, "/run/secrets/") {
+		return true
+	}
+	b := strings.ToLower(path.Base(p))
+	for _, ext := range []string{".key", ".pem", ".p12", ".pfx", ".env"} {
+		if strings.HasSuffix(b, ext) {
+			return true
+		}
+	}
+	return b == ".env" || stacks.SensitiveKey.MatchString(strings.TrimSuffix(b, path.Ext(b)))
 }

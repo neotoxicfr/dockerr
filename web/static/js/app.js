@@ -19,6 +19,8 @@ function toast(msg, bad = false) {
   setTimeout(() => t.remove(), bad ? 6000 : 3000);
 }
 
+const autoBusy = new Set(); // stacks whose auto-update switch is being saved
+
 // ---- confirm dialog ----
 function confirmAsk(title, text, yes) {
   const d = $("#confirm");
@@ -261,9 +263,13 @@ document.addEventListener("click", async (e) => {
   }
   const au = e.target.closest("[data-autoupdate]");
   if (au) {
-    // One request at a time: a quick second click must not land first.
+    // One request per stack at a time, even if a refresh redraws the switch.
+    const name = au.dataset.autoupdate;
+    if (autoBusy.has(name)) { au.checked = !au.checked; return; }
+    autoBusy.add(name);
     au.disabled = true;
-    const r = await post(`/s/${encodeURIComponent(au.dataset.autoupdate)}/autoupdate`, { on: au.checked ? "1" : "0" });
+    const r = await post(`/s/${encodeURIComponent(name)}/autoupdate`, { on: au.checked ? "1" : "0" });
+    autoBusy.delete(name);
     au.disabled = false;
     if (!r.ok) {
       au.checked = !au.checked;

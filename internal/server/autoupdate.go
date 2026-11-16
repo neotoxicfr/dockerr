@@ -88,10 +88,9 @@ func (s *Server) autoUpdate(ctx context.Context) {
 	}
 	// A check already running (started by hand) would make this one return
 	// at once with stale results: wait for it first.
-	if !s.updates.WaitIdle(ctx) {
+	if !s.updates.CheckWhenIdle(ctx, s.imageRefs(ctx)) {
 		return
 	}
-	s.updates.Check(ctx, s.imageRefs(ctx))
 	_, list, err := s.snapshot(ctx)
 	if err != nil {
 		slog.Warn("auto update: stacks unreadable", "err", err)

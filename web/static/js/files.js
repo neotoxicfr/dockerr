@@ -9,16 +9,19 @@ const text = document.getElementById("fb-text");
 const saveBtn = document.getElementById("fb-save");
 if (text && saveBtn) {
   let saved = text.value;
+  let saving = false; // one save at a time, whatever the button shows
   const dirty = () => text.value !== saved;
-  text.addEventListener("input", () => (saveBtn.disabled = !dirty()));
+  text.addEventListener("input", () => (saveBtn.disabled = saving || !dirty()));
   window.addEventListener("beforeunload", (e) => { if (dirty()) e.preventDefault(); });
   const save = async () => {
-    if (!dirty()) return;
+    if (saving || !dirty()) return;
+    saving = true;
     saveBtn.disabled = true;
     const value = text.value;
     // Browsers turn line ends into \n; a CRLF file keeps its own.
     const content = text.dataset.crlf ? value.replace(/\r?\n/g, "\r\n") : value;
     const r = await post(`${base}/save`, { path: here, content }, true);
+    saving = false;
     if (!r.ok) {
       saveBtn.disabled = false;
       toast(r.body.error || "Échec de l'enregistrement", true);
