@@ -402,13 +402,6 @@ func (s *Server) eventStream(w http.ResponseWriter, r *http.Request) {
 // Background starts the loops the server depends on.
 func (s *Server) Background(ctx context.Context) {
 	go s.stats.Loop(ctx)
-	// Before the server listens: a helper created by an early request must
-	// not be taken for an orphan and removed under it.
-	if s.docker.Caps.Containers && s.docker.Caps.Write {
-		hctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		s.removeHelpers(hctx)
-		cancel()
-	}
 	if s.docker.Caps.Events {
 		go s.events.Loop(ctx)
 	} else {
@@ -425,6 +418,14 @@ func (s *Server) Background(ctx context.Context) {
 				}
 			}
 		}()
+	}
+	// Events first, so none is missed meanwhile; still before the server
+	// listens: a helper created by an early request must not be taken for
+	// an orphan and removed under it.
+	if s.docker.Caps.Containers && s.docker.Caps.Write {
+		hctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		s.removeHelpers(hctx)
+		cancel()
 	}
 	go s.updates.Loop(ctx, s.cfg.UpdateInterval, s.imageRefs)
 	go s.autoUpdateLoop(ctx)
