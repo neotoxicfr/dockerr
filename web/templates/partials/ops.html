@@ -5,7 +5,7 @@
   <details class="card op">
     <summary>
       <span class="dot {{if .Err}}bad{{else}}ok{{end}}"></span>
-      {{if $.Stack}}<a href="/s/{{.Stack}}?tab=ops"><strong>{{.Stack}}</strong></a>{{end}}
+      {{if $.Stack}}{{if .Host}}<span class="badge plain">{{.Host}}</span>{{end}}<a href="/s/{{.Stack}}?tab=ops"><strong>{{.Stack}}</strong></a>{{end}}
       <span>{{opLabel .Kind}}{{if .Service}} <span class="muted">· {{.Service}}</span>{{end}}</span>
       {{if .Err}}<span class="faint">échec</span>{{end}}
       <span class="muted who">{{.User}}</span>

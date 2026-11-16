@@ -109,7 +109,10 @@ func (c *Container) Paused() bool  { return c.State == string(container.StatePau
 
 type Manager struct {
 	Docker *docker.Docker
-	Dir    string
+	Dir    string // "" when the host's stacks are not mounted here
+	// Remote: the daemon runs on another machine, so the compose file paths
+	// in its labels are only ours under Dir (mounted at the same path).
+	Remote bool
 
 	mu    sync.Mutex
 	cache map[string]cachedProject // compose file path → parsed project
@@ -246,9 +249,12 @@ func (m *Manager) Containers(ctx context.Context) ([]*Container, error) {
 // file, plus compose projects found on containers.
 func (m *Manager) List(ctx context.Context, all []*Container) ([]*Stack, error) {
 	byName := map[string]*Stack{}
-	entries, err := os.ReadDir(m.Dir)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, err
+	var entries []os.DirEntry
+	var err error
+	if m.Dir != "" {
+		if entries, err = os.ReadDir(m.Dir); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
 	}
 	for _, e := range entries {
 		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
@@ -279,8 +285,7 @@ func (m *Manager) List(ctx context.Context, all []*Container) ([]*Stack, error) 
 		st := byName[c.Project]
 		if st == nil {
 			st = &Stack{Name: c.Project}
-			if files := c.Labels[api.ConfigFilesLabel]; files != "" {
-				f, _, _ := strings.Cut(files, ",")
+			if f := m.LabelFile(c.Labels); f != "" {
 				if _, err := os.Stat(f); err == nil {
 					st.File, st.Dir = f, filepath.Dir(f)
 				}
@@ -300,6 +305,22 @@ func (m *Manager) List(ctx context.Context, all []*Container) ([]*Stack, error) 
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
+}
+
+// LabelFile returns the first compose file a container was created from,
+// when that path can be read here.
+func (m *Manager) LabelFile(labels map[string]string) string {
+	f, _, _ := strings.Cut(labels[api.ConfigFilesLabel], ",")
+	if f == "" || !m.Remote {
+		return f
+	}
+	if m.Dir == "" {
+		return ""
+	}
+	if rel, err := filepath.Rel(m.Dir, f); err != nil || !filepath.IsLocal(rel) {
+		return ""
+	}
+	return f
 }
 
 // Get returns one stack by name.

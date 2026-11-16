@@ -102,7 +102,7 @@ func (s *Server) notifyUpdates(rs []updates.Result) {
 		title = fmt.Sprintf("%d nouvelles images disponibles", len(lines))
 	}
 	// The images are the key: another image found soon after still goes out.
-	s.notifier.Notify(notify.Event{Kind: notify.Update, Title: title, Message: strings.Join(lines, "\n"), Priority: 3,
+	s.notify(notify.Event{Kind: notify.Update, Title: title, Message: strings.Join(lines, "\n"), Priority: 3,
 		Container: strings.Join(refs, " ")})
 }
 

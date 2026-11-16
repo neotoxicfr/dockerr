@@ -96,7 +96,7 @@ func (s *Server) autoUpdate(ctx context.Context) {
 		slog.Warn("auto update: stacks unreadable", "err", err)
 		return
 	}
-	names, err := s.store.AutoUpdates(ctx)
+	names, err := s.store.AutoUpdates(ctx, s.storeHost())
 	if err != nil {
 		slog.Warn("auto update: opt-ins unreadable", "err", err)
 	}
@@ -146,7 +146,7 @@ func (s *Server) autoUpdate(ctx context.Context) {
 	if failed > 0 {
 		msg += fmt.Sprintf("\n%d échec(s), notifiés à part.", failed)
 	}
-	s.notifier.Notify(notify.Event{Kind: notify.AutoUpdate, Title: title, Message: msg, Priority: 3, Container: strings.Join(done, " ")})
+	s.notify(notify.Event{Kind: notify.AutoUpdate, Title: title, Message: msg, Priority: 3, Container: strings.Join(done, " ")})
 }
 
 // waitOp blocks until the operation ends (or ctx does).
@@ -176,7 +176,7 @@ func (s *Server) stackAutoUpdate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusConflict, "cette pile fait tourner dockerr : elle ne peut pas se mettre à jour seule")
 		return
 	}
-	if err := s.store.SetAutoUpdate(r.Context(), st.Name, r.FormValue("on") == "1", auth.User(r.Context())); err != nil {
+	if err := s.store.SetAutoUpdate(r.Context(), s.storeHost(), st.Name, r.FormValue("on") == "1", auth.User(r.Context())); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

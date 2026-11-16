@@ -30,16 +30,19 @@ const (
 )
 
 type Event struct {
-	Kind      string    `json:"event"`
-	Title     string    `json:"title"`
-	Message   string    `json:"message"`
+	Kind    string `json:"event"`
+	Title   string `json:"title"`
+	Message string `json:"message"`
+	// Host names the Docker host when dockerr manages several; the title
+	// then starts with it.
+	Host      string    `json:"host,omitempty"`
 	Stack     string    `json:"stack,omitempty"`
 	Container string    `json:"container,omitempty"`
 	Priority  int       `json:"priority"` // 1 (min) to 5 (urgent), ntfy's scale
 	Time      time.Time `json:"time"`
 }
 
-// Quiet is how long the same event (kind, stack, container) stays silent
+// Quiet is how long the same event (kind, host, stack, container) stays silent
 // after it was sent.
 const Quiet = 10 * time.Minute
 
@@ -96,7 +99,7 @@ func (n *Notifier) Notify(e Event) {
 	if !n.Enabled() {
 		return
 	}
-	key := e.Kind + "|" + e.Stack + "|" + e.Container
+	key := e.Kind + "|" + e.Host + "|" + e.Stack + "|" + e.Container
 	n.mu.Lock()
 	if t, ok := n.last[key]; ok && time.Since(t) < Quiet {
 		n.mu.Unlock()
@@ -129,6 +132,9 @@ func (n *Notifier) Send(ctx context.Context, e Event) error {
 	}
 	if e.Priority == 0 {
 		e.Priority = 3
+	}
+	if e.Host != "" {
+		e.Title = e.Host + " · " + e.Title
 	}
 	var errs []error
 	if n.ntfyURL != "" {

@@ -46,22 +46,29 @@
     </div>
   </section>
 
+  {{$multi := gt (len $d.Hosts) 1}}
+  {{range $d.Hosts}}
   <section>
-    <h2 class="section">Accès Docker</h2>
+    <h2 class="section">{{if $multi}}<span class="dot {{if .Up}}ok{{else}}bad{{end}}"></span>Hôte {{.Name}}{{else}}Accès Docker{{end}}</h2>
+    {{if .Plain}}<div class="banner warn"><svg class="i s"><use href="#i-alert"/></svg><div><strong>TCP sans TLS.</strong> Quiconque joint ce port, ou lit le trafic, a les droits root sur cet hôte. Active TLS sur le démon (<code>--tlsverify</code>) et donne à dockerr ses certificats client : <code>{{.TLSVar}}</code> (ca.pem, cert.pem, key.pem).</div></div>{{end}}
+    {{if not .Up}}<p class="error-box">Injoignable{{if .Err}} : {{.Err}}{{end}}</p>{{end}}
     <div class="card">
       <div class="kv">
-        <div class="k">Point d'accès</div><div class="mono">{{$d.Host}}</div>
-        <div class="k">Docker</div><div>{{$d.DaemonVersion}} <span class="faint">API {{$d.APIVersion}}</span></div>
-        <div class="k">Dossier des piles</div><div class="mono">{{$d.StacksDir}}</div>
+        <div class="k">Point d'accès</div><div class="mono">{{.Endpoint}}</div>
+        {{if .DaemonVersion}}<div class="k">Docker</div><div>{{.DaemonVersion}} <span class="faint">API {{.APIVersion}}</span></div>{{end}}
+        <div class="k">Dossier des piles</div><div>{{if .StacksDir}}<span class="mono">{{.StacksDir}}</span>{{else}}<span class="muted">non monté : démarrer, arrêter et redémarrer seulement</span>{{end}}</div>
       </div>
     </div>
+    {{if .Caps}}
     <div class="card gap-top">
       <ul class="caps">
-        {{range $d.Caps}}<li>{{if .OK}}<svg class="i s ok"><use href="#i-check"/></svg>{{else}}<svg class="i s no"><use href="#i-x"/></svg>{{end}}<span {{if not .OK}}class="muted"{{end}}>{{.Name}}</span>{{if not .OK}}<code>{{.Env}}</code>{{end}}</li>{{end}}
+        {{range .Caps}}<li>{{if .OK}}<svg class="i s ok"><use href="#i-check"/></svg>{{else}}<svg class="i s no"><use href="#i-x"/></svg>{{end}}<span {{if not .OK}}class="muted"{{end}}>{{.Name}}</span>{{if not .OK}}<code>{{.Env}}</code>{{end}}</li>{{end}}
         <li>{{if $d.ExecEnabled}}<svg class="i s ok"><use href="#i-check"/></svg>{{else}}<svg class="i s no"><use href="#i-x"/></svg>{{end}}<span {{if not $d.ExecEnabled}}class="muted"{{end}}>Terminal activé dans dockerr</span>{{if not $d.ExecEnabled}}<code>DOCKERR_EXEC=1</code>{{end}}</li>
       </ul>
     </div>
+    {{end}}
   </section>
+  {{end}}
 
   {{if $d.RecentOps}}
   <section>
@@ -69,7 +76,7 @@
     <div class="table-wrap"><table>
       <tbody>{{range $d.RecentOps}}
         <tr><td><span class="dot {{if .Err}}bad{{else}}ok{{end}}"></span></td>
-          <td><a href="/s/{{.Stack}}?tab=ops"><strong>{{.Stack}}</strong></a>{{if .Service}} <span class="muted">· {{.Service}}</span>{{end}}</td>
+          <td>{{if .Host}}<span class="badge plain">{{.Host}}</span> {{end}}<a href="/s/{{.Stack}}?tab=ops"><strong>{{.Stack}}</strong></a>{{if .Service}} <span class="muted">· {{.Service}}</span>{{end}}</td>
           <td>{{opLabel .Kind}}{{if .Err}} <span class="faint" title="{{.Err}}">· échec</span>{{end}}</td>
           <td class="muted">{{.User}}</td><td class="num muted">{{since .Started}}</td></tr>
       {{end}}</tbody>

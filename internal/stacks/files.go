@@ -197,10 +197,16 @@ func writeAtomicMode(path string, data []byte, mode os.FileMode, owner int) erro
 	return os.Rename(tmp.Name(), path)
 }
 
+// ErrNoDir: the host's stacks folder is not mounted in dockerr.
+var ErrNoDir = errors.New("le dossier des piles de cet hôte n'est pas monté dans dockerr (DOCKERR_STACKS_DIR_<NOM>)")
+
 // Create makes a new stack folder with its compose file.
 func (m *Manager) Create(name, composeText, envText string) (string, error) {
 	if !ValidName(name) {
 		return "", fmt.Errorf("nom invalide : minuscules, chiffres, - et _")
+	}
+	if m.Dir == "" {
+		return "", ErrNoDir
 	}
 	dir := filepath.Join(m.Dir, name)
 	if err := os.Mkdir(dir, 0o755); err != nil {

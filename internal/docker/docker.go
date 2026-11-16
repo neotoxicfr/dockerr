@@ -9,11 +9,13 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/flags"
+	"github.com/docker/go-connections/tlsconfig"
 	"github.com/moby/moby/client"
 )
 
@@ -24,12 +26,24 @@ type Docker struct {
 	Host string
 }
 
-func New(ctx context.Context) (*Docker, error) {
+// New connects to the daemon at host (tcp://…), with the client
+// certificates of tlsDir when set; host "" follows DOCKER_HOST.
+func New(ctx context.Context, host, tlsDir string) (*Docker, error) {
 	cli, err := command.NewDockerCli(command.WithCombinedStreams(io.Discard), command.WithInputStream(io.NopCloser(strings.NewReader(""))))
 	if err != nil {
 		return nil, err
 	}
-	if err := cli.Initialize(flags.NewClientOptions()); err != nil {
+	opts := flags.NewClientOptions()
+	if host != "" {
+		opts.Hosts = []string{host}
+	}
+	if tlsDir != "" {
+		// The daemon's certificate is checked against ca.pem.
+		opts.TLS, opts.TLSVerify = true, true
+		opts.TLSOptions = &tlsconfig.Options{CAFile: filepath.Join(tlsDir, flags.DefaultCaFile),
+			CertFile: filepath.Join(tlsDir, flags.DefaultCertFile), KeyFile: filepath.Join(tlsDir, flags.DefaultKeyFile)}
+	}
+	if err := cli.Initialize(opts); err != nil {
 		return nil, fmt.Errorf("docker client: %w", err)
 	}
 	d := &Docker{API: cli.Client(), CLI: cli, Host: cli.Client().DaemonHost()}

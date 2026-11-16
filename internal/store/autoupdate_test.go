@@ -14,17 +14,24 @@ func TestAutoUpdates(t *testing.T) {
 	}
 	defer s.Close()
 	for _, n := range []string{"web", "db", "web"} {
-		if err := s.SetAutoUpdate(ctx, n, true, "u"); err != nil {
+		if err := s.SetAutoUpdate(ctx, "", n, true, "u"); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if got, err := s.AutoUpdates(ctx); err != nil || !slices.Equal(got, []string{"db", "web"}) {
+	if got, err := s.AutoUpdates(ctx, ""); err != nil || !slices.Equal(got, []string{"db", "web"}) {
 		t.Fatalf("got %v, %v", got, err)
 	}
-	if err := s.SetAutoUpdate(ctx, "db", false, "u"); err != nil {
+	if err := s.SetAutoUpdate(ctx, "", "db", false, "u"); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := s.AutoUpdates(ctx); !slices.Equal(got, []string{"web"}) {
+	// Another host's stack of the same name is its own.
+	if err := s.SetAutoUpdate(ctx, "pi", "web", true, "u"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.AutoUpdates(ctx, "pi"); !slices.Equal(got, []string{"web"}) {
+		t.Fatalf("pi = %v", got)
+	}
+	if got, _ := s.AutoUpdates(ctx, ""); !slices.Equal(got, []string{"web"}) {
 		t.Fatalf("after off: %v", got)
 	}
 }

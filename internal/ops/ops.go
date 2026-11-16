@@ -353,7 +353,7 @@ func (r *Runner) recreate(ctx context.Context, op *Op, c *stacks.Container) erro
 	if c.Project == "" || c.Service == "" {
 		return errors.New("conteneur hors compose : à recréer à la main")
 	}
-	file, _, _ := strings.Cut(c.Labels[api.ConfigFilesLabel], ",")
+	file := r.Stacks.LabelFile(c.Labels)
 	if file == "" {
 		return errors.New("fichier compose inconnu")
 	}

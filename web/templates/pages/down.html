@@ -1,0 +1,10 @@
+{{define "content"}}{{$d := .Data}}
+<header class="bar"><h1>{{$d.Name}}</h1></header>
+<div class="card empty">
+  <p><strong>Hôte injoignable</strong></p>
+  <p class="mono faint">{{$d.Endpoint}}</p>
+  {{if $d.Err}}<p class="error-box">{{$d.Err}}</p>{{end}}
+  <p>dockerr réessaie toutes les 15 secondes.</p>
+  <a class="btn" href="/settings">Réglages</a>
+</div>
+{{end}}

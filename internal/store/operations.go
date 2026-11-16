@@ -74,10 +74,11 @@ func (s *Store) OpCounts(ctx context.Context) ([]OpCount, error) {
 	return out, rows.Err()
 }
 
-// Ops returns the latest operations, newest first; stack "" lists all.
-func (s *Store) Ops(ctx context.Context, stack string, n int) ([]Operation, error) {
+// Ops returns the latest operations, newest first: those of a stack on a
+// host ("" = the local one), or with stack "" all of them, every host.
+func (s *Store) Ops(ctx context.Context, host, stack string, n int) ([]Operation, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id, host, stack, service, kind, user, started_at, ended_at, err, tasks
-		FROM operations WHERE ? = '' OR stack = ? ORDER BY started_at DESC LIMIT ?`, stack, stack, n)
+		FROM operations WHERE ? = '' OR (stack = ? AND host = ?) ORDER BY started_at DESC LIMIT ?`, stack, stack, host, n)
 	if err != nil {
 		return nil, fmt.Errorf("lecture des opérations : %w", err)
 	}

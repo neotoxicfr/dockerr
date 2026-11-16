@@ -40,6 +40,14 @@ never be the only thing standing in front of the Docker API.
   (`tecnativa/docker-socket-proxy`) with only the sections dockerr needs. At
   start, dockerr probes each section with requests that have no side effect and
   disables what the proxy refuses.
+- **Remote hosts** (`DOCKERR_HOSTS`): a Docker endpoint on TCP is root on
+  that machine for whoever reaches the port or reads the traffic. Use TLS
+  with client certificates (`dockerd --tlsverify`, and `ca.pem`, `cert.pem`,
+  `key.pem` in `DOCKERR_TLS_<NAME>_DIR`): dockerr then checks the daemon's
+  certificate against `ca.pem`. Plain TCP is accepted for a socket proxy on
+  a trusted private link only; dockerr logs a warning at start and shows one
+  in its settings. Put a socket proxy in front of the remote daemon too, with
+  the same rights as locally.
 - **Terminal off by default**: it needs `DOCKERR_EXEC=1` *and* `EXEC=1` on the
   proxy. Every session is logged (user, container, start, end).
 - **Self-protection**: dockerr refuses to operate the stack it runs in.

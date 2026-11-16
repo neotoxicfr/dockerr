@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -19,7 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/moby/moby/api/types/events"
 	"github.com/neotoxicfr/dockerr/internal/auth"
 	"github.com/neotoxicfr/dockerr/internal/config"
 	"github.com/neotoxicfr/dockerr/internal/docker"
@@ -35,7 +35,12 @@ import (
 var Version = "dev"
 
 type Server struct {
-	cfg     *config.Config
+	cfg *config.Config
+	// The fields from docker to events belong to cur, the host this copy
+	// of the server serves; hosts lists them all, the local one first.
+	cur     *dockerHost
+	hosts   []*dockerHost
+	mux     http.Handler
 	docker  *docker.Docker
 	stacks  *stacks.Manager
 	runner  *ops.Runner
@@ -53,35 +58,34 @@ type Server struct {
 }
 
 type Deps struct {
-	Config  *config.Config
-	Docker  *docker.Docker
-	Stacks  *stacks.Manager
-	Runner  *ops.Runner
-	Store   *store.Store
-	Updates *updates.Checker
-	Stats   *docker.Stats
-	Events  *docker.Events
-	Notify  *notify.Notifier
+	Config *config.Config
+	Store  *store.Store
+	Notify *notify.Notifier
+	// Hosts: the local host first, connected now; the others connect in
+	// the background.
+	Hosts []HostDeps
 }
 
-func New(d Deps) (*Server, error) {
-	s := &Server{cfg: d.Config, docker: d.Docker, stacks: d.Stacks, runner: d.Runner, store: d.Store,
-		updates: d.Updates, stats: d.Stats, events: d.Events, notifier: d.Notify, alertsNudge: make(chan struct{}, 1)}
-	if s.notifier.Enabled() {
-		dw := &deaths{stopped: map[string]time.Time{}}
-		s.events.OnContainer = func(m events.Message) {
-			if e, ok := dw.event(m, time.Now()); ok {
-				s.notifier.Notify(e)
-			}
-		}
-		s.updates.OnAvailable = s.notifyUpdates
+// New returns the server of the local host.
+func New(ctx context.Context, d Deps) (*Server, error) {
+	if len(d.Hosts) == 0 {
+		return nil, errors.New("aucun hôte Docker")
+	}
+	s := &Server{cfg: d.Config, store: d.Store, notifier: d.Notify}
+	for _, h := range d.Hosts {
+		s.hosts = append(s.hosts, &dockerHost{HostDeps: h})
 	}
 	var err error
 	if s.pages, err = parseTemplates(); err != nil {
 		return nil, err
 	}
 	s.static, _ = fs.Sub(web.FS, "static")
-	return s, nil
+	b, err := d.Hosts[0].Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s.hosts[0].set(nil)
+	return s.bind(s.hosts[0], b), nil
 }
 
 func parseTemplates() (map[string]*template.Template, error) {
@@ -105,6 +109,20 @@ func parseTemplates() (map[string]*template.Template, error) {
 }
 
 func (s *Server) Handler() http.Handler {
+	a := &auth.Auth{Header: s.cfg.AuthHeader, Trusted: s.cfg.TrustedProxies, Hosts: s.cfg.TrustedHosts, Insecure: s.cfg.InsecureNoAuth,
+		Group: s.cfg.RequireGroup, GroupsHeader: s.cfg.GroupsHeader}
+	open := func(r *http.Request) bool {
+		p := r.URL.Path
+		// /api/status and /metrics check their own key instead of the auth
+		// proxy's header.
+		return p == "/healthz" || p == "/manifest.webmanifest" || p == "/sw.js" || strings.HasPrefix(p, "/static/") ||
+			((p == "/api/status" || p == "/metrics") && r.Method == http.MethodGet) || (p == "/api/updates/check" && r.Method == http.MethodPost)
+	}
+	return securityHeaders(a.Middleware(http.HandlerFunc(s.dispatch), open))
+}
+
+// routes serves this server's host; dispatch picks the server.
+func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/status", s.apiStatus)
 	mux.HandleFunc("POST /api/updates/check", s.apiCheck)
@@ -168,16 +186,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /operations", s.operations)
 	mux.HandleFunc("POST /settings/mode", s.setMode)
 	mux.HandleFunc("POST /prefs", s.setPref)
-
-	a := &auth.Auth{Header: s.cfg.AuthHeader, Trusted: s.cfg.TrustedProxies, Hosts: s.cfg.TrustedHosts, Insecure: s.cfg.InsecureNoAuth,
-		Group: s.cfg.RequireGroup, GroupsHeader: s.cfg.GroupsHeader}
-	open := func(r *http.Request) bool {
-		p := r.URL.Path
-		// /api/status checks its own key instead of the auth proxy's header.
-		return p == "/healthz" || p == "/manifest.webmanifest" || p == "/sw.js" || strings.HasPrefix(p, "/static/") ||
-			((p == "/api/status" || p == "/metrics") && r.Method == http.MethodGet) || (p == "/api/updates/check" && r.Method == http.MethodPost)
-	}
-	return securityHeaders(a.Middleware(mux, open))
+	mux.HandleFunc("POST /host", s.selectHost)
+	return mux
 }
 
 const cspRest = "object-src 'none'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
@@ -295,7 +305,9 @@ type page struct {
 	Version  string
 	Caps     docker.Caps
 	Nonce    string // CSP nonce for injected <style> elements
-	Data     any
+	// Hosts feed the host selector, shown when there are several.
+	Hosts []hostView
+	Data  any
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name, title, nav string, data any) {
@@ -305,6 +317,9 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name, title, nav
 		return
 	}
 	p := page{Title: title, Nav: nav, User: auth.User(r.Context()), Advanced: s.advanced(r), Version: Version, Caps: s.docker.Caps, Nonce: nonce(r), Data: data}
+	if len(s.hosts) > 1 {
+		p.Hosts = s.hostViews(r, false)
+	}
 	var b bytes.Buffer
 	if err := t.ExecuteTemplate(&b, "layout", p); err != nil {
 		slog.Error("render", "page", name, "err", err)
@@ -399,8 +414,14 @@ func (s *Server) eventStream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Background starts the loops the server depends on.
+// Background starts the loops the server depends on, for every host.
 func (s *Server) Background(ctx context.Context) {
+	s.loops(ctx)
+	s.watchHosts(ctx)
+}
+
+// loops starts what this server's host needs running.
+func (s *Server) loops(ctx context.Context) {
 	go s.stats.Loop(ctx)
 	// Before the server listens: a helper created by an early request must
 	// not be taken for an orphan and removed under it.

@@ -7,8 +7,8 @@ import (
 )
 
 // AutoUpdates lists the stacks opted in to automatic updates on the local host.
-func (s *Store) AutoUpdates(ctx context.Context) ([]string, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT stack FROM auto_update WHERE host = '' ORDER BY stack`)
+func (s *Store) AutoUpdates(ctx context.Context, host string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT stack FROM auto_update WHERE host = ? ORDER BY stack`, host)
 	if err != nil {
 		return nil, fmt.Errorf("lecture des mises à jour automatiques : %w", err)
 	}
@@ -25,13 +25,13 @@ func (s *Store) AutoUpdates(ctx context.Context) ([]string, error) {
 }
 
 // SetAutoUpdate opts a stack in or out of automatic updates.
-func (s *Store) SetAutoUpdate(ctx context.Context, stack string, on bool, by string) error {
+func (s *Store) SetAutoUpdate(ctx context.Context, host, stack string, on bool, by string) error {
 	var err error
 	if on {
-		_, err = s.db.ExecContext(ctx, `INSERT INTO auto_update (stack, host, created_by, created_at) VALUES (?, '', ?, ?) ON CONFLICT (stack, host) DO NOTHING`,
-			stack, by, time.Now().Unix())
+		_, err = s.db.ExecContext(ctx, `INSERT INTO auto_update (stack, host, created_by, created_at) VALUES (?, ?, ?, ?) ON CONFLICT (stack, host) DO NOTHING`,
+			stack, host, by, time.Now().Unix())
 	} else {
-		_, err = s.db.ExecContext(ctx, `DELETE FROM auto_update WHERE stack = ? AND host = ''`, stack)
+		_, err = s.db.ExecContext(ctx, `DELETE FROM auto_update WHERE stack = ? AND host = ?`, stack, host)
 	}
 	if err != nil {
 		return fmt.Errorf("réglage de la mise à jour automatique : %w", err)
