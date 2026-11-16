@@ -735,5 +735,15 @@ func sensitiveFile(p string) bool {
 			return true
 		}
 	}
-	return b == ".env" || stacks.SensitiveKey.MatchString(strings.TrimSuffix(b, path.Ext(b)))
+	// .env, .env.local, .env.production…
+	if b == ".env" || strings.HasPrefix(b, ".env.") {
+		return true
+	}
+	// The name without its extension; a hidden file (.secret_token) keeps
+	// its whole name, which path.Ext would take for an extension.
+	stem := strings.TrimPrefix(b, ".")
+	if i := strings.LastIndex(stem, "."); i > 0 {
+		stem = stem[:i]
+	}
+	return stacks.SensitiveKey.MatchString(stem)
 }

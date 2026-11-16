@@ -326,6 +326,10 @@ func TestSensitiveFile(t *testing.T) {
 		"/etc/hostname":            false,
 		"/var/log/app.log":         false,
 		"/app/config.yaml":         false,
+		"/app/.env.production":     true,
+		"/root/.secret_token":      true,
+		"/home/u/.pgpass":          true,
+		"/app/.gitignore":          false,
 	}
 	for p, want := range cases {
 		if got := sensitiveFile(p); got != want {
