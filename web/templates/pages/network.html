@@ -13,8 +13,8 @@
       <small>{{if eq $c.Name "host"}}hôte{{else}}{{$c.Driver}}{{end}} · {{$c.Count}}</small>
       {{if $c.Internal}}<span class="badge plain">interne</span>{{else}}<span class="badge-sp"></span>{{end}}</span></th>{{end}}
   </tr></thead>
-  <tbody>
   {{range $g := $m.Groups}}
+  <tbody>
     {{range $i, $r := .Rows}}
     <tr{{if eq $i 0}} class="first"{{end}}>
       {{if eq $i 0}}<th scope="rowgroup" class="stk" rowspan="{{len $g.Rows}}">{{if $g.Stack}}<a href="/s/{{$g.Stack}}">{{$g.Stack}}</a>{{else}}<span class="faint">hors compose</span>{{end}}</th>{{end}}
@@ -26,8 +26,8 @@
       {{range $i, $cell := $r.Cells}}{{$col := index $m.Cols $i}}<td class="bus{{if $cell.On}} on{{end}}{{if eq $col.Name "host"}} host{{end}}" data-col="{{$i}}">{{if $cell.On}}<span class="tap" title="{{$r.C.Name}} sur {{$col.Name}}{{if $cell.IP}} · {{$cell.IP}}{{end}}"></span>{{if $cell.IP}}<span class="ip">{{$cell.IP}}</span>{{end}}{{end}}</td>{{end}}
     </tr>
     {{end}}
-  {{end}}
   </tbody>
+  {{end}}
 </table>
 </div>
 <div class="netmap-legend">

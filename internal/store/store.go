@@ -41,6 +41,7 @@ func Open(ctx context.Context, dir string) (*Store, error) {
 	s := &Store{db: db}
 	// Retention also applies when no operation runs for a while.
 	if err := s.pruneOps(ctx); err != nil {
+		_ = db.Close()
 		return nil, err
 	}
 	return s, nil
