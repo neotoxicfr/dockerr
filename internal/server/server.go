@@ -19,9 +19,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/moby/moby/api/types/events"
 	"github.com/neotoxicfr/dockerr/internal/auth"
 	"github.com/neotoxicfr/dockerr/internal/config"
 	"github.com/neotoxicfr/dockerr/internal/docker"
+	"github.com/neotoxicfr/dockerr/internal/notify"
 	"github.com/neotoxicfr/dockerr/internal/ops"
 	"github.com/neotoxicfr/dockerr/internal/stacks"
 	"github.com/neotoxicfr/dockerr/internal/store"
@@ -41,6 +43,8 @@ type Server struct {
 	updates *updates.Checker
 	stats   *docker.Stats
 	events  *docker.Events
+	// notifier may be nil: notifications off.
+	notifier *notify.Notifier
 
 	pages  map[string]*template.Template
 	static fs.FS
@@ -55,11 +59,21 @@ type Deps struct {
 	Updates *updates.Checker
 	Stats   *docker.Stats
 	Events  *docker.Events
+	Notify  *notify.Notifier
 }
 
 func New(d Deps) (*Server, error) {
 	s := &Server{cfg: d.Config, docker: d.Docker, stacks: d.Stacks, runner: d.Runner, store: d.Store,
-		updates: d.Updates, stats: d.Stats, events: d.Events}
+		updates: d.Updates, stats: d.Stats, events: d.Events, notifier: d.Notify}
+	if s.notifier.Enabled() {
+		dw := &deaths{stopped: map[string]time.Time{}}
+		s.events.OnContainer = func(m events.Message) {
+			if e, ok := dw.event(m, time.Now()); ok {
+				s.notifier.Notify(e)
+			}
+		}
+		s.updates.OnAvailable = s.notifyUpdates
+	}
 	var err error
 	if s.pages, err = parseTemplates(); err != nil {
 		return nil, err
@@ -135,6 +149,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /c/{id}/exec", s.execSocket)
 
 	mux.HandleFunc("GET /settings", s.settings)
+	mux.HandleFunc("POST /notify/test", s.notifyTest)
 	mux.HandleFunc("GET /operations", s.operations)
 	mux.HandleFunc("POST /settings/mode", s.setMode)
 	mux.HandleFunc("POST /prefs", s.setPref)

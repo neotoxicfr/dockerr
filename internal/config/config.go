@@ -37,6 +37,10 @@ type Config struct {
 	// host dockerr is reached on.
 	PortHost string
 
+	// NtfyURL (https://server/topic), NtfyToken and WebhookURL turn on
+	// notifications; empty: off.
+	NtfyURL, NtfyToken, WebhookURL string
+
 	UpdateInterval time.Duration
 	// RepairNetDeps recreates containers left without a network namespace
 	// after an operation (network_mode: container:/service:).
@@ -57,8 +61,19 @@ func Load() (*Config, error) {
 		PortHost:       os.Getenv("DOCKERR_PORT_HOST"),
 		APIKeysFile:    os.Getenv("DOCKERR_API_KEYS_FILE"),
 		RepairNetDeps:  envBool("DOCKERR_REPAIR_NETDEPS", true),
+		NtfyURL:        os.Getenv("DOCKERR_NTFY_URL"),
+		NtfyToken:      os.Getenv("DOCKERR_NTFY_TOKEN"),
+		WebhookURL:     os.Getenv("DOCKERR_WEBHOOK_URL"),
 	}
 	var err error
+	// A token file keeps the secret out of the container's environment.
+	if f := os.Getenv("DOCKERR_NTFY_TOKEN_FILE"); f != "" {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			return nil, fmt.Errorf("DOCKERR_NTFY_TOKEN_FILE: %w", err)
+		}
+		c.NtfyToken = strings.TrimSpace(string(b))
+	}
 	if c.UpdateInterval, err = time.ParseDuration(env("DOCKERR_UPDATE_INTERVAL", "6h")); err != nil {
 		return nil, fmt.Errorf("DOCKERR_UPDATE_INTERVAL: %w", err)
 	}

@@ -623,6 +623,7 @@ type settingsData struct {
 	ExecLog                         []store.ExecEntry
 	StacksDir                       string
 	RecentOps                       []store.Operation
+	Notify                          []string // notification channels in use
 }
 
 type capView struct {
@@ -641,6 +642,7 @@ func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 	d.LastCheck, d.Checking = s.updates.LastRun()
 	d.ExecLog, _ = s.store.ExecLog(r.Context(), 20)
 	d.RecentOps, _ = s.store.Ops(r.Context(), "", 10)
+	d.Notify = s.notifier.Targets()
 	s.render(w, r, "settings", "Réglages", "settings", d)
 }
 

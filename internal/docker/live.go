@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/events"
 	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 )
@@ -136,6 +137,9 @@ func (s *Stats) sample(ctx context.Context) {
 // changed" signal; pages then reload what they show.
 type Events struct {
 	api client.APIClient
+	// OnContainer, when set, receives each container event (die, oom,
+	// health_status…), for notifications.
+	OnContainer func(events.Message)
 
 	mu   sync.Mutex
 	subs map[chan struct{}]struct{}
@@ -184,6 +188,9 @@ func (e *Events) Loop(ctx context.Context) {
 				// exec_* and top events fire constantly and change nothing visible.
 				if a := string(m.Action); len(a) >= 5 && a[:5] == "exec_" || a == "top" {
 					continue
+				}
+				if m.Type == events.ContainerEventType && e.OnContainer != nil {
+					e.OnContainer(m)
 				}
 				e.Notify()
 			case err := <-res.Err:
