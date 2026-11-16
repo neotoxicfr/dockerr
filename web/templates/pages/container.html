@@ -4,6 +4,7 @@
   <h1><span class="name">{{$c.Name}}</span> <span class="pill"><span class="dot {{ctrClass $c.Container}}"></span>{{ctrLabel $c.Container}}</span></h1>
   <div class="bar-actions">
     <a class="btn" href="/c/{{short $c.ID}}/logs"><svg class="i s"><use href="#i-logs"/></svg>Logs</a>
+    {{if $.Caps.Containers}}<a class="btn" href="/c/{{short $c.ID}}/files"><svg class="i s"><use href="#i-folder"/></svg>Fichiers</a>{{end}}
     {{if $c.DozzleURL}}<a class="btn ghost" href="{{$c.DozzleURL}}/container/{{short $c.ID}}" target="_blank" rel="noopener">Dozzle</a>{{end}}
     {{if and $c.Running $c.ExecEnabled}}<a class="btn" href="/c/{{short $c.ID}}/terminal"><svg class="i s"><use href="#i-terminal"/></svg>Terminal</a>{{end}}
     {{if $c.Self}}<span class="pill" title="Les actions sur ce conteneur arrêteraient dockerr">Conteneur de dockerr</span>{{else}}

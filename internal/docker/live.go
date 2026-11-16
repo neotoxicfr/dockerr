@@ -186,7 +186,9 @@ func (e *Events) Loop(ctx context.Context) {
 				return
 			case m := <-res.Messages:
 				// exec_* and top events fire constantly and change nothing visible.
-				if a := string(m.Action); len(a) >= 5 && a[:5] == "exec_" || a == "top" {
+				// So do the file browser's reads and writes, and its helper containers.
+				if a := string(m.Action); len(a) >= 5 && a[:5] == "exec_" || a == "top" ||
+					a == "archive-path" || a == "extract-to-dir" || m.Actor.Attributes["dockerr.helper"] != "" {
 					continue
 				}
 				if m.Type == events.ContainerEventType && e.OnContainer != nil {

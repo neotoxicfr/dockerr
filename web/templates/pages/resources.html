@@ -149,13 +149,14 @@
 <div class="fitbox">
 <div class="section-bar"><span class="grow"></span><button class="btn" data-prune="volumes" data-confirm="Supprimer les volumes anonymes inutilisés ? Les volumes nommés sont gardés.">Supprimer les anonymes inutilisés</button></div>
 <div class="table-wrap"><table data-filterable>
-  <thead><tr><th>Volume</th><th>Pile</th><th>Utilisé par</th><th class="num">Créé</th></tr></thead>
+  <thead><tr><th>Volume</th><th>Pile</th><th>Utilisé par</th><th class="num">Créé</th>{{if and $caps.Containers $caps.Write}}<th aria-label="Actions"></th>{{end}}</tr></thead>
   <tbody>{{range $d.Volumes}}
   <tr data-text="{{.Name}} {{.Project}}">
     <td class="mono" title="{{.Name}}">{{volName .Name}}</td>
     <td>{{if .Project}}<a href="/s/{{.Project}}">{{.Project}}</a>{{else}}<span class="faint">—</span>{{end}}</td>
     <td>{{if .Users}}{{range $i, $c := .Users}}{{if $i}}, {{end}}{{$c.Name}}{{end}}{{else}}<span class="faint">aucun</span>{{end}}</td>
     <td class="num muted">{{.Created}}</td>
+    {{if and $caps.Containers $caps.Write}}<td class="num"><a class="btn sm" href="/volumes/{{.Name}}/files"><svg class="i s"><use href="#i-folder"/></svg>Fichiers</a></td>{{end}}
   </tr>{{end}}</tbody>
 </table></div>
 </div>

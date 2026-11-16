@@ -1,0 +1,46 @@
+{{define "content"}}{{$d := .Data}}
+<header class="bar">
+  <a class="back" href="{{$d.Back}}" aria-label="Retour"><svg class="i"><use href="#i-back"/></svg></a>
+  <h1>Fichiers <span class="name">{{$d.Name}}</span></h1>
+  <div class="bar-actions">
+    {{if and $d.Dir $d.CanWrite (not $d.Error)}}<button class="btn" type="button" id="fb-pick"><svg class="i s"><use href="#i-upload"/></svg>Téléverser</button><input type="file" id="fb-upload" multiple hidden>{{end}}
+    {{if or $d.Dir $d.File}}{{if not $d.Error}}<a class="btn" href="{{$d.Base}}/download?path={{$d.Path}}" download><svg class="i s"><use href="#i-download"/></svg>Télécharger{{if $d.Dir}} (tar){{end}}</a>{{end}}{{end}}
+  </div>
+</header>
+<div class="files" id="files" data-base="{{$d.Base}}" data-path="{{$d.Path}}">
+  <div class="fb-nav">
+    <nav class="crumbs mono" aria-label="Chemin">{{range $i, $c := $d.Crumbs}}{{if gt $i 1}}<span class="sep">/</span>{{end}}<a href="{{$d.Base}}?path={{$c.Path}}"{{if eq $c.Path $d.Path}} aria-current="page"{{end}}>{{$c.Name}}</a>{{end}}</nav>
+    <form class="fb-goto" method="get" action="{{$d.Base}}"><input name="path" value="{{$d.Path}}" class="mono" aria-label="Chemin" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn sm">Ouvrir</button></form>
+  </div>
+  {{if $d.Error}}<div class="error-box">{{$d.Error}}</div>
+  {{else if $d.Dir}}
+  {{if $d.List.Truncated}}<div class="banner warn"><svg class="i s"><use href="#i-alert"/></svg><span>Liste incomplète : ce dossier est trop grand pour être lu en entier. Saisis un chemin plus précis.</span></div>{{end}}
+  {{if $d.List.Entries}}
+  <div class="table-wrap"><table class="fb-list">
+    <thead><tr><th>Nom</th><th class="num">Taille</th><th>Droits</th><th class="num">Modifié</th></tr></thead>
+    <tbody>{{range $d.List.Entries}}
+    <tr><td><a class="fb-name" href="{{$d.Base}}?path={{.Path}}"><svg class="i s"><use href="#i-{{if .Link}}link{{else if .Dir}}folder{{else}}file{{end}}"/></svg><span>{{.Name}}</span></a>{{if .Link}} <span class="faint mono">→ {{.Link}}</span>{{end}}</td>
+      <td class="num muted">{{if not (or .Dir .Link)}}{{bytes .Size}}{{end}}</td>
+      <td class="mono muted">{{.Mode}}</td>
+      <td class="num muted">{{if not .Mtime.IsZero}}{{datetime .Mtime}}{{end}}</td></tr>{{end}}
+    </tbody>
+  </table></div>
+  {{else}}<div class="empty">Dossier vide</div>{{end}}
+  {{else if $d.File}}{{$f := $d.File}}
+  <div class="card kv fb-meta">
+    <div class="k">Taille</div><div>{{bytes $f.Size}}</div>
+    <div class="k">Droits</div><div class="mono">{{$f.Mode}}</div>
+    <div class="k">Modifié</div><div>{{datetime $f.Mtime}}</div>
+  </div>
+  {{if $f.Reason}}<p class="muted">{{$f.Reason}}</p>
+  {{else}}
+  <textarea id="fb-text" class="mono fb-text" spellcheck="false" autocapitalize="off" aria-label="Contenu de {{base $d.Path}}"{{if not $f.Editable}} readonly{{end}}{{if $f.CRLF}} data-crlf="1"{{end}}>
+{{$f.Text}}</textarea>
+  {{if $f.Editable}}<div class="section-bar fb-save"><span class="grow"></span><button class="btn primary" type="button" id="fb-save" disabled><svg class="i s"><use href="#i-check"/></svg>Enregistrer</button></div>{{end}}
+  {{end}}
+  {{else if $d.Link}}
+  <div class="card kv"><div class="k">Lien symbolique vers</div><div class="mono">{{if $d.LinkPath}}<a href="{{$d.Base}}?path={{$d.LinkPath}}">{{$d.Link}}</a>{{else}}{{$d.Link}}{{end}}</div></div>
+  {{end}}
+</div>
+<script type="module" src="/static/js/files.js?v={{.Version}}"></script>
+{{end}}

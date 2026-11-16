@@ -153,6 +153,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /images/{id}/remove", s.imageRemove)
 	mux.HandleFunc("GET /network", s.networkPage)
 	mux.HandleFunc("GET /c/{id}/terminal", s.terminalPage)
+	for _, base := range []string{"/c/{id}/files", "/volumes/{name}/files"} {
+		mux.HandleFunc("GET "+base, s.filesPage)
+		mux.HandleFunc("GET "+base+"/download", s.filesDownload)
+		mux.HandleFunc("POST "+base+"/save", s.filesSave)
+		mux.HandleFunc("POST "+base+"/upload", s.filesUpload)
+	}
 	mux.HandleFunc("GET /c/{id}/exec", s.execSocket)
 
 	mux.HandleFunc("GET /settings", s.settings)
@@ -396,6 +402,9 @@ func (s *Server) eventStream(w http.ResponseWriter, r *http.Request) {
 // Background starts the loops the server depends on.
 func (s *Server) Background(ctx context.Context) {
 	go s.stats.Loop(ctx)
+	if s.docker.Caps.Containers && s.docker.Caps.Write {
+		go s.removeHelpers(ctx)
+	}
 	if s.docker.Caps.Events {
 		go s.events.Loop(ctx)
 	} else {
