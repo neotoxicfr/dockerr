@@ -49,6 +49,8 @@
     <div class="svc-sub">
       <span class="mono" title="{{if $c}}{{$c.Image}}{{else}}{{$s.Image}}{{end}}">{{if $c}}{{imageTag $c.Image}}{{else}}{{imageTag $s.Image}}{{end}}</span>
       {{if $s.Update}}<span class="badge upd"><svg class="i s"><use href="#i-update"/></svg>Nouvelle image</span>{{end}}
+      {{if and $s.Newer $st.Managed}}<a class="badge upd" href="/s/{{$st.Name}}?tab=compose&amp;bump={{$s.Name}}&amp;from={{$s.Ref}}&amp;to={{newTag $s.Ref $s.Newer}}" title="Passer à {{$s.Newer}} : le compose est modifié, tu vois la différence avant d'appliquer"><svg class="i s"><use href="#i-update"/></svg>{{$s.Newer}} disponible</a>{{end}}
+      {{if and $s.NewerMajor $st.Managed}}<a class="badge plain" href="/s/{{$st.Name}}?tab=compose&amp;bump={{$s.Name}}&amp;from={{$s.Ref}}&amp;to={{newTag $s.Ref $s.NewerMajor}}" title="Version majeure : lis ses notes avant de passer">{{$s.NewerMajor}} (majeure)</a>{{end}}
       {{if $c}}{{if $c.NetParent}}
         {{if $c.NetLost}}<span class="netline bad"><svg class="i s"><use href="#i-alert"/></svg>Réseau de {{$c.NetParent}} perdu <button class="btn sm" data-op="repair" data-stack="{{$st.Name}}">Réparer</button></span>
         {{else}}<span class="netline" title="network_mode: container"><svg class="i s"><use href="#i-link"/></svg>via {{$c.NetParent}}</span>{{end}}

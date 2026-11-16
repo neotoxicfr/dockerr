@@ -199,3 +199,83 @@ func parseChallenge(h string) (string, map[string]string) {
 	}
 	return scheme, params
 }
+
+// maxTagPages bounds the tag listing: an image with tens of thousands of
+// tags (nightlies) is not worth more requests.
+const maxTagPages = 20
+
+// Tags lists a repository's tags, following the registry's pagination.
+func (r *registry) Tags(ctx context.Context, ref string) ([]string, error) {
+	named, err := reference.ParseNormalizedNamed(ref)
+	if err != nil {
+		return nil, err
+	}
+	host, path := reference.Domain(named), reference.Path(named)
+	apiHost := host
+	if host == "docker.io" {
+		apiHost = "registry-1.docker.io"
+	}
+	base := "https://" + apiHost
+	next := base + "/v2/" + path + "/tags/list?n=1000"
+	scope := "repository:" + path + ":pull"
+	var tok string
+	var tags []string
+	for page := 0; next != "" && page < maxTagPages; page++ {
+		resp, err := r.get(ctx, next, host, tok)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode == http.StatusUnauthorized && tok == "" {
+			resp.Body.Close()
+			if tok, err = r.token(ctx, resp.Header.Get("WWW-Authenticate"), host, scope); err != nil {
+				return nil, err
+			}
+			page--
+			continue
+		}
+		var body struct {
+			Tags []string `json:"tags"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("%s : liste des tags, HTTP %d", host, resp.StatusCode)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%s : liste des tags illisible", host)
+		}
+		tags = append(tags, body.Tags...)
+		next = nextPage(resp.Header.Get("Link"), base)
+	}
+	return tags, nil
+}
+
+func (r *registry) get(ctx context.Context, u, host, tok string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case tok != "":
+		req.Header.Set("Authorization", "Bearer "+tok)
+	case r.creds != nil:
+		if user, pass := r.creds(host); user != "" {
+			req.SetBasicAuth(user, pass)
+		}
+	}
+	return r.http.Do(req)
+}
+
+// nextPage reads `</v2/…/tags/list?last=x&n=1000>; rel="next"`; a link to
+// another host is not followed.
+func nextPage(link, base string) string {
+	l, rel, ok := strings.Cut(link, ";")
+	if !ok || !strings.Contains(rel, `rel="next"`) {
+		return ""
+	}
+	l = strings.Trim(strings.TrimSpace(l), "<>")
+	if !strings.HasPrefix(l, "/v2/") {
+		return ""
+	}
+	return base + l
+}

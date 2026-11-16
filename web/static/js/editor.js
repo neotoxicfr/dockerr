@@ -730,6 +730,24 @@ async function init() {
   await check();
   render();
   updateButtons();
+  await bump();
+}
+
+// bump comes from a "newer version" badge: it changes a service's image
+// tag in the compose file, then shows the diff to save and apply.
+async function bump() {
+  const q = new URLSearchParams(location.search);
+  const svc = q.get("bump"), from = q.get("from"), to = q.get("to");
+  if (!svc || !from || !to || !editable) return;
+  history.replaceState(null, "", location.pathname + "?tab=compose");
+  const s = st.model && st.model.services.find((x) => x.name === svc);
+  if (!s || s.image !== from || s.locked.includes("image")) {
+    return toast(`L'image de ${svc} n'est pas écrite telle quelle dans le compose (variable…) : change-la en texte`, true);
+  }
+  await check([{ op: "set", path: ["services", svc, "image"], value: to }]);
+  render();
+  updateButtons();
+  if (st.compose.includes(to)) save(true);
 }
 
 init();

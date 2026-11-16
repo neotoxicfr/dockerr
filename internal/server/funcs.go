@@ -18,6 +18,13 @@ var funcs = template.FuncMap{
 	"cpu":        func(f float64) string { return fmt.Sprintf("%.1f %%", f) },
 	"since":      since,
 	"opLabel":    func(k string) string { return ops.Labels[ops.Kind(k)] },
+	// newTag swaps the tag of an image reference: nginx:1.27, 1.29 → nginx:1.29.
+	"newTag": func(ref, tag string) string {
+		if i := strings.LastIndex(ref, ":"); i > strings.LastIndex(ref, "/") {
+			return ref[:i+1] + tag
+		}
+		return ref + ":" + tag
+	},
 	"datetime":   func(t time.Time) string { return t.Local().Format("02/01/2006 15:04") },
 	"short":      func(s string) string { s = strings.TrimPrefix(s, "sha256:"); return s[:min(12, len(s))] },
 	"stateLabel": stateLabel,

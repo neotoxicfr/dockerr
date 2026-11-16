@@ -69,6 +69,9 @@ type Service struct {
 	// 0 counts as up.
 	OneShot bool
 	Update  bool
+	// Ref is the image reference running; Newer and NewerMajor later tags
+	// of it (see updates.Result).
+	Ref, Newer, NewerMajor string
 }
 
 type Container struct {
