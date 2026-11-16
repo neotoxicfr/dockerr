@@ -55,6 +55,20 @@ func (c *Checker) Get(ref string) (Result, bool) {
 	return r, ok
 }
 
+// WaitIdle waits until no check runs; false if ctx ended first.
+func (c *Checker) WaitIdle(ctx context.Context) bool {
+	for {
+		if _, running := c.LastRun(); !running {
+			return true
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(time.Second):
+		}
+	}
+}
+
 func (c *Checker) LastRun() (time.Time, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

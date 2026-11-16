@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestOnAvailable(t *testing.T) {
@@ -51,5 +52,27 @@ func TestTransientErrorIsNotNew(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatalf("announced %d times, want 1", calls)
+	}
+}
+
+func TestWaitIdle(t *testing.T) {
+	c := &Checker{results: map[string]Result{}}
+	if !c.WaitIdle(context.Background()) {
+		t.Fatal("idle checker must not wait")
+	}
+	c.running = true
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if c.WaitIdle(ctx) {
+		t.Fatal("a cancelled wait must report false")
+	}
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		c.mu.Lock()
+		c.running = false
+		c.mu.Unlock()
+	}()
+	if !c.WaitIdle(context.Background()) {
+		t.Fatal("the wait must end when the check does")
 	}
 }

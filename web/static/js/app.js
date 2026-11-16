@@ -261,7 +261,10 @@ document.addEventListener("click", async (e) => {
   }
   const au = e.target.closest("[data-autoupdate]");
   if (au) {
+    // One request at a time: a quick second click must not land first.
+    au.disabled = true;
     const r = await post(`/s/${encodeURIComponent(au.dataset.autoupdate)}/autoupdate`, { on: au.checked ? "1" : "0" });
+    au.disabled = false;
     if (!r.ok) {
       au.checked = !au.checked;
       return toast(r.body.error || "Échec", true);
