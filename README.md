@@ -42,7 +42,10 @@ another container's network**, like apps routed through a VPN container.
 - **A visible check after every change**: once you stop typing, dockerr loads
   the file the way compose does and tells you whether the stack will start —
   syntax errors with their line, undefined variables, missing external
-  networks or volumes, ports already taken, missing secret or bind files.
+  networks or volumes, ports already taken, missing secret or bind files —
+  and what starts but is risky: secrets written in the file, a database port
+  open on every interface, the Docker socket mounted, `privileged`, unpinned
+  images, the obsolete `version:` key. One click fixes what is unambiguous.
 - **Secrets**: create, edit and attach file secrets to services; values are
   masked until you click, written `0600` in the stack folder, mounted under
   `/run/secrets`. Compose mounts file secrets as they are, so a container that
@@ -54,6 +57,9 @@ another container's network**, like apps routed through a VPN container.
 - **Update checks** straight against the registries with `HEAD` requests: no
   Docker Hub pull quota spent, private registries through the usual
   `config.json`. A pulled image that a container does not run yet counts too.
+- **Operations history**: every start, stop, update… with who, when, how long,
+  the result and compose's full output, per stack and for all stacks (kept 90
+  days).
 - **New stack** from a pasted compose file.
 - **Logs** stay with [Dozzle](https://dozzle.dev): set `DOCKERR_DOZZLE_URL` for
   a link on every container.

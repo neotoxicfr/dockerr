@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/neotoxicfr/dockerr/internal/ops"
 	"github.com/neotoxicfr/dockerr/internal/stacks"
 )
 
@@ -16,6 +17,7 @@ var funcs = template.FuncMap{
 	"bytes":      humanBytes,
 	"cpu":        func(f float64) string { return fmt.Sprintf("%.1f %%", f) },
 	"since":      since,
+	"opLabel":    func(k string) string { return ops.Labels[ops.Kind(k)] },
 	"datetime":   func(t time.Time) string { return t.Local().Format("02/01/2006 15:04") },
 	"short":      func(s string) string { s = strings.TrimPrefix(s, "sha256:"); return s[:min(12, len(s))] },
 	"stateLabel": stateLabel,

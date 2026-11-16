@@ -30,6 +30,7 @@
 <nav class="tabs">
   <a href="/s/{{$st.Name}}" {{if eq $d.Tab "services"}}aria-current="page"{{end}}>Services</a>
   {{if $st.File}}<a href="/s/{{$st.Name}}?tab=compose" {{if eq $d.Tab "compose"}}aria-current="page"{{end}}>Compose</a>{{end}}
+  <a href="/s/{{$st.Name}}?tab=ops" {{if eq $d.Tab "ops"}}aria-current="page"{{end}}>Opérations</a>
   {{if $adv}}<a href="/s/{{$st.Name}}?tab=history" {{if eq $d.Tab "history"}}aria-current="page"{{end}}>Historique</a>{{end}}
 </nav>
 {{if $st.LoadErr}}<div class="error-box">{{$st.LoadErr}}</div>{{end}}

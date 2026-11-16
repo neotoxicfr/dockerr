@@ -40,12 +40,12 @@
 
   {{if $d.RecentOps}}
   <section>
-    <h2 class="section">Activité</h2>
+    <h2 class="section">Activité <a class="btn ghost sm" href="/operations">Tout l'historique</a></h2>
     <div class="table-wrap"><table>
       <tbody>{{range $d.RecentOps}}
-        <tr><td><span class="dot {{if not .Done}}warn{{else if .Err}}bad{{else}}ok{{end}}"></span></td>
-          <td><a href="/s/{{.Stack}}"><strong>{{.Stack}}</strong></a>{{if .Service}} <span class="muted">· {{.Service}}</span>{{end}}</td>
-          <td>{{.Label}}{{if .Err}} <span class="faint" title="{{.Err}}">· échec</span>{{end}}</td>
+        <tr><td><span class="dot {{if .Err}}bad{{else}}ok{{end}}"></span></td>
+          <td><a href="/s/{{.Stack}}?tab=ops"><strong>{{.Stack}}</strong></a>{{if .Service}} <span class="muted">· {{.Service}}</span>{{end}}</td>
+          <td>{{opLabel .Kind}}{{if .Err}} <span class="faint" title="{{.Err}}">· échec</span>{{end}}</td>
           <td class="muted">{{.User}}</td><td class="num muted">{{since .Started}}</td></tr>
       {{end}}</tbody>
     </table></div>

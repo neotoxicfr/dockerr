@@ -130,6 +130,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /c/{id}/exec", s.execSocket)
 
 	mux.HandleFunc("GET /settings", s.settings)
+	mux.HandleFunc("GET /operations", s.operations)
 	mux.HandleFunc("POST /settings/mode", s.setMode)
 	mux.HandleFunc("POST /prefs", s.setPref)
 

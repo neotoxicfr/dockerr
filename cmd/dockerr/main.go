@@ -72,7 +72,17 @@ func run() error {
 		return a.Username, a.Password
 	}
 	upd := updates.New(d.API, creds)
-	runner.OnDone = func(ops.Snapshot) { events.Notify() }
+	runner.OnDone = func(o ops.Snapshot) {
+		events.Notify()
+		rec := store.Operation{ID: o.ID, Stack: o.Stack, Service: o.Service, Kind: string(o.Kind), User: o.User,
+			Started: o.Started, Ended: o.Ended, Err: o.Err}
+		for _, t := range o.Tasks {
+			rec.Tasks = append(rec.Tasks, store.OpTask{ID: t.ID, Text: t.Text, Details: t.Details, Status: t.Status})
+		}
+		if err := st.SaveOp(context.Background(), rec); err != nil {
+			slog.Warn("operation not recorded", "stack", o.Stack, "err", err)
+		}
+	}
 
 	srv, err := server.New(server.Deps{Config: cfg, Docker: d, Stacks: mgr, Runner: runner, Store: st,
 		Updates: upd, Stats: docker.NewStats(d.API), Events: events})

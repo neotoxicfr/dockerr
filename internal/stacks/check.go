@@ -102,6 +102,7 @@ func Check(ctx context.Context, name, dir, composeText, envText string, host Hos
 			r.Issues = append(r.Issues, Issue{Line: at("secrets", key), Message: fmt.Sprintf("secret %s : le fichier %s n'existe pas", key, s.File)})
 		}
 	}
+	r.Warnings = append(r.Warnings, lint(p, composeText, env, at)...)
 	byLine := func(a, b Issue) int { return a.Line - b.Line }
 	slices.SortStableFunc(r.Issues, byLine)
 	slices.SortStableFunc(r.Warnings, byLine)

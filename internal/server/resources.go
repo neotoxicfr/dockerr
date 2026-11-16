@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -272,7 +271,7 @@ func (s *Server) containerPage(w http.ResponseWriter, r *http.Request) {
 		v.Cmd = strings.Join(append(slices.Clone(in.Config.Entrypoint), in.Config.Cmd...), " ")
 		for _, e := range in.Config.Env {
 			k, val, _ := strings.Cut(e, "=")
-			if sensitiveKey.MatchString(k) {
+			if stacks.SensitiveKey.MatchString(k) {
 				val = "" // never in the page: fetched when the user clicks
 				v.Secret = append(v.Secret, k)
 			}
@@ -432,9 +431,6 @@ func isoDate(s string) string {
 	}
 	return t.Local().Format("02/01/2006 15:04:05")
 }
-
-// sensitiveKey matches environment variables that likely hold a secret.
-var sensitiveKey = regexp.MustCompile(`(?i)pass|secret|token|key|pwd|auth|cred|private|salt`)
 
 // containerEnv returns one environment value, for the reveal button.
 func (s *Server) containerEnv(w http.ResponseWriter, r *http.Request) {

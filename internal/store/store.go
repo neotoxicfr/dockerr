@@ -1,5 +1,5 @@
 // Package store keeps dockerr's own state in SQLite: compose file history,
-// user preferences and the exec audit log.
+// user preferences, the exec audit log and the operations history.
 package store
 
 import (
