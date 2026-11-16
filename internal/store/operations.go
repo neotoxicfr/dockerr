@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -29,16 +30,23 @@ func (o Operation) Duration() time.Duration { return o.Ended.Sub(o.Started).Roun
 func (s *Store) SaveOp(ctx context.Context, o Operation) error {
 	tasks, err := json.Marshal(o.Tasks)
 	if err != nil {
-		return err
+		return fmt.Errorf("opération %s : %w", o.ID, err)
 	}
 	_, err = s.db.ExecContext(ctx, `INSERT OR REPLACE INTO operations
 		(id, host, stack, service, kind, user, started_at, ended_at, err, tasks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		o.ID, o.Host, o.Stack, o.Service, o.Kind, o.User, o.Started.UnixMilli(), o.Ended.UnixMilli(), o.Err, string(tasks))
 	if err != nil {
-		return err
+		return fmt.Errorf("enregistrement de l'opération %s : %w", o.ID, err)
 	}
-	_, err = s.db.ExecContext(ctx, `DELETE FROM operations WHERE started_at < ?`, time.Now().Add(-opsRetention).UnixMilli())
-	return err
+	return s.pruneOps(ctx)
+}
+
+// pruneOps drops operations past retention.
+func (s *Store) pruneOps(ctx context.Context) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM operations WHERE started_at < ?`, time.Now().Add(-opsRetention).UnixMilli()); err != nil {
+		return fmt.Errorf("purge des opérations : %w", err)
+	}
+	return nil
 }
 
 // Ops returns the latest operations, newest first; stack "" lists all.
@@ -46,7 +54,7 @@ func (s *Store) Ops(ctx context.Context, stack string, n int) ([]Operation, erro
 	rows, err := s.db.QueryContext(ctx, `SELECT id, host, stack, service, kind, user, started_at, ended_at, err, tasks
 		FROM operations WHERE ? = '' OR stack = ? ORDER BY started_at DESC LIMIT ?`, stack, stack, n)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("lecture des opérations : %w", err)
 	}
 	defer rows.Close()
 	var out []Operation
