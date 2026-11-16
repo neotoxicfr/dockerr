@@ -5,6 +5,7 @@
   <div class="bar-actions">
     {{if $st.Self}}<span class="pill" title="Les opérations sur cette pile arrêteraient dockerr">Pile de dockerr</span>{{else}}
     {{if $st.Updates}}<button class="btn primary" data-op="update" data-stack="{{$st.Name}}" {{if not $caps.Compose}}aria-disabled="true"{{end}}><svg class="i s"><use href="#i-update"/></svg>Mettre à jour</button>{{end}}
+    {{if $st.Total}}<a class="btn" href="/s/{{$st.Name}}/logs" title="Logs de la pile"><svg class="i s"><use href="#i-logs"/></svg><span class="lbl">Logs</span></a>{{end}}
     {{if eq $st.Up 0}}
     <button class="btn {{if not $st.Updates}}primary{{end}}" data-op="start" data-stack="{{$st.Name}}" {{if not $st.File}}aria-disabled="true"{{end}}><svg class="i s"><use href="#i-play"/></svg>Démarrer</button>
     {{else}}
@@ -63,7 +64,7 @@
     {{if $c.Running}}<span class="svc-res">{{cpu $c.CPU}} · {{bytes $c.Mem}}</span>{{end}}{{end}}
   </div>
   <div class="svc-act">
-    {{if and $c $d.DozzleURL}}<a class="btn ghost" href="{{$d.DozzleURL}}/container/{{short $c.ID}}" target="_blank" rel="noopener" title="Logs" aria-label="Logs de {{$s.Name}}"><svg class="i"><use href="#i-logs"/></svg><span class="lbl">Logs</span></a>{{end}}
+    {{if $c}}<a class="btn ghost" href="/c/{{short $c.ID}}/logs" title="Logs" aria-label="Logs de {{$s.Name}}"><svg class="i"><use href="#i-logs"/></svg><span class="lbl">Logs</span></a>{{end}}
     {{if not $st.Self}}
     {{if and $c $c.Running}}
     <button class="btn ghost" data-op="restart" data-stack="{{$st.Name}}" data-service="{{$s.Name}}" title="Redémarrer" aria-label="Redémarrer {{$s.Name}}"><svg class="i"><use href="#i-restart"/></svg><span class="lbl">Redémarrer</span></button>

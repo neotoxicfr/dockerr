@@ -3,7 +3,8 @@
   <a class="back" href="{{if $c.Project}}/s/{{$c.Project}}{{else}}/resources{{end}}" aria-label="Retour"><svg class="i"><use href="#i-back"/></svg></a>
   <h1><span class="name">{{$c.Name}}</span> <span class="pill"><span class="dot {{ctrClass $c.Container}}"></span>{{ctrLabel $c.Container}}</span></h1>
   <div class="bar-actions">
-    {{if $c.DozzleURL}}<a class="btn" href="{{$c.DozzleURL}}/container/{{short $c.ID}}" target="_blank" rel="noopener"><svg class="i s"><use href="#i-logs"/></svg>Logs</a>{{end}}
+    <a class="btn" href="/c/{{short $c.ID}}/logs"><svg class="i s"><use href="#i-logs"/></svg>Logs</a>
+    {{if $c.DozzleURL}}<a class="btn ghost" href="{{$c.DozzleURL}}/container/{{short $c.ID}}" target="_blank" rel="noopener">Dozzle</a>{{end}}
     {{if and $c.Running $c.ExecEnabled}}<a class="btn" href="/c/{{short $c.ID}}/terminal"><svg class="i s"><use href="#i-terminal"/></svg>Terminal</a>{{end}}
     {{if $c.Running}}
     <button class="btn" data-ctr-action="restart" data-id="{{short $c.ID}}"><svg class="i s"><use href="#i-restart"/></svg>Redémarrer</button>

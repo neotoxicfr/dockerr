@@ -1,0 +1,28 @@
+{{define "content"}}{{$d := .Data}}
+<header class="bar">
+  <a class="back" href="{{$d.Back}}" aria-label="{{$d.BackLabel}}"><svg class="i"><use href="#i-back"/></svg></a>
+  <h1>Logs <span class="name">{{$d.Title}}</span></h1>
+</header>
+<div class="logs" id="logs">
+  <div class="logs-bar">
+    <label class="search"><svg class="i s"><use href="#i-search"/></svg><input type="search" id="lg-q" placeholder="Rechercher" autocomplete="off" spellcheck="false" aria-label="Rechercher dans les logs"></label>
+    <select id="lg-since" aria-label="Période">
+      <option value="">300 dernières lignes</option>
+      <option value="900">15 dernières minutes</option>
+      <option value="3600">Dernière heure</option>
+      <option value="86400">Dernières 24 h</option>
+      <option value="all">Tout</option>
+    </select>
+    <label class="check-line"><input type="checkbox" id="lg-err"> Erreurs seulement</label>
+    <span class="grow"></span>
+    <button class="btn" id="lg-pause" type="button"><svg class="i s"><use href="#i-pause"/></svg><span>Pause</span></button>
+    <button class="btn" id="lg-dl" type="button"><svg class="i s"><use href="#i-download"/></svg>Télécharger</button>
+  </div>
+  {{if gt (len $d.Containers) 1}}<div class="logs-ctrs">{{range $i, $c := $d.Containers}}
+    <label class="lg-ctr c{{$i}}"><input type="checkbox" checked data-id="{{$c.ID}}" data-name="{{logName $c}}"><span class="dot {{ctrClass $c}}"></span>{{logName $c}}</label>{{end}}
+  </div>{{else}}{{range $d.Containers}}<input type="hidden" class="lg-one" data-id="{{.ID}}" data-name="{{logName .}}">{{end}}{{end}}
+  <div class="logs-out" id="lg-out" role="log" aria-label="Logs" tabindex="0"></div>
+  <div class="logs-status" id="lg-status" aria-live="polite"></div>
+</div>
+<script type="module" src="/static/js/logs.js?v={{.Version}}"></script>
+{{end}}
