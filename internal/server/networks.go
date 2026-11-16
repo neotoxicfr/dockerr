@@ -36,7 +36,7 @@ var predefined = map[string]bool{"bridge": true, "host": true, "none": true}
 func (n netSpec) options() (client.NetworkCreateOptions, error) {
 	var o client.NetworkCreateOptions
 	if !netNameRe.MatchString(n.Name) {
-		return o, errors.New("nom invalide : lettres, chiffres, - _ et .")
+		return o, errors.New("nom invalide : lettres, chiffres, tirets, soulignés et points")
 	}
 	if predefined[n.Name] {
 		return o, fmt.Errorf("%s est un réseau de Docker", n.Name)
