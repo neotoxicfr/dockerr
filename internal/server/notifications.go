@@ -32,6 +32,12 @@ func (d *deaths) event(m events.Message, now time.Time) (notify.Event, bool) {
 	name, stack := a["name"], a[api.ProjectLabel]
 	e := notify.Event{Stack: stack, Container: name, Priority: 4}
 	switch m.Action {
+	case events.ActionStart:
+		// Started again: a crash from now on is a crash.
+		d.mu.Lock()
+		delete(d.stopped, m.Actor.ID)
+		d.mu.Unlock()
+		return e, false
 	case events.ActionKill, events.ActionStop:
 		d.mu.Lock()
 		d.stopped[m.Actor.ID] = now
@@ -72,11 +78,9 @@ func (d *deaths) event(m events.Message, now time.Time) (notify.Event, bool) {
 func (s *Server) notifyUpdates(rs []updates.Result) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	all, err := s.stacks.Containers(ctx)
-	if err != nil {
-		return
-	}
-	var lines []string
+	// Without the container list the message only lacks the services.
+	all, _ := s.stacks.Containers(ctx)
+	var lines, refs []string
 	for _, r := range rs {
 		var users []string
 		for _, c := range all {
@@ -85,14 +89,21 @@ func (s *Server) notifyUpdates(rs []updates.Result) {
 			}
 		}
 		slices.Sort(users)
-		lines = append(lines, fmt.Sprintf("%s (%s)", r.Ref, strings.Join(slices.Compact(users), ", ")))
+		line := r.Ref
+		if len(users) > 0 {
+			line += " (" + strings.Join(slices.Compact(users), ", ") + ")"
+		}
+		lines, refs = append(lines, line), append(refs, r.Ref)
 	}
 	slices.Sort(lines)
+	slices.Sort(refs)
 	title := "Nouvelle image disponible"
 	if len(lines) > 1 {
 		title = fmt.Sprintf("%d nouvelles images disponibles", len(lines))
 	}
-	s.notifier.Notify(notify.Event{Kind: notify.Update, Title: title, Message: strings.Join(lines, "\n"), Priority: 3})
+	// The images are the key: another image found soon after still goes out.
+	s.notifier.Notify(notify.Event{Kind: notify.Update, Title: title, Message: strings.Join(lines, "\n"), Priority: 3,
+		Container: strings.Join(refs, " ")})
 }
 
 // notifyTest sends a test notification and reports the result.

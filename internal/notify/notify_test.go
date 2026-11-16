@@ -77,7 +77,7 @@ func TestNew(t *testing.T) {
 		{"https://ntfy.example.com/dockerr", "", ""},
 		{"https://ntfy.example.com/", "", "sujet"},
 		{"https://ntfy.example.com/a/b", "", "sujet"},
-		{"", "ftp://example.com/x", "invalide"},
+		{"", "ftp://example.com/x", "URL http(s) attendue"},
 		{"", "https://example.com/hook", ""},
 	}
 	for _, c := range cases {
@@ -93,17 +93,59 @@ func TestNew(t *testing.T) {
 }
 
 func TestNoSecretInErrorsOrTargets(t *testing.T) {
-	n, err := New("http://127.0.0.1:1/s3cret-topic", "tk", "http://127.0.0.1:1/hooks/s3cret-token")
-	if err != nil {
-		t.Fatal(err)
+	// Each channel, with the secret in the user info, the path or the query.
+	cases := []struct{ name, ntfy, hook string }{
+		{"ntfy topic", "http://127.0.0.1:1/s3cret", ""},
+		{"ntfy user info", "http://u:s3cret@127.0.0.1:1/topic", ""},
+		{"webhook path", "", "http://127.0.0.1:1/hooks/s3cret"},
+		{"webhook query", "", "http://127.0.0.1:1/hook?token=s3cret"},
+		{"webhook user info", "", "http://u:s3cret@127.0.0.1:1/hook"},
 	}
-	err = n.Send(context.Background(), Event{Kind: Test})
-	if err == nil || strings.Contains(err.Error(), "s3cret") {
-		t.Fatalf("error leaks the URL: %v", err)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			n, err := New(c.ntfy, "", c.hook)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = n.Send(context.Background(), Event{Kind: Test})
+			if err == nil || strings.Contains(err.Error(), "s3cret") {
+				t.Errorf("send error = %v", err)
+			}
+			for _, s := range n.Targets() {
+				if strings.Contains(s, "s3cret") {
+					t.Errorf("target = %s", s)
+				}
+			}
+		})
 	}
-	for _, s := range n.Targets() {
-		if strings.Contains(s, "s3cret") {
-			t.Errorf("target leaks the URL: %s", s)
-		}
+	if _, err := New("ftp://s3cret@example.com/x", "", ""); err == nil || strings.Contains(err.Error(), "s3cret") {
+		t.Errorf("config error = %v", err)
+	}
+}
+
+func TestFailedSendIsNotSilenced(t *testing.T) {
+	var mu sync.Mutex
+	hits := 0
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits++
+		mu.Unlock()
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer s.Close()
+	n, _ := New("", "", s.URL)
+	e := Event{Kind: Died, Stack: "a", Container: "a-1"}
+	count := func() int { mu.Lock(); defer mu.Unlock(); return hits }
+	n.Notify(e)
+	for i := 0; count() < 1 && i < 100; i++ {
+		time.Sleep(20 * time.Millisecond)
+	}
+	time.Sleep(100 * time.Millisecond) // the failure clears the key
+	n.Notify(e)
+	for i := 0; count() < 2 && i < 100; i++ {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if got := count(); got != 2 {
+		t.Fatalf("attempts = %d, want 2: a failed send must not silence the next one", got)
 	}
 }

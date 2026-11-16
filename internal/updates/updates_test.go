@@ -34,3 +34,22 @@ func TestOnAvailable(t *testing.T) {
 		t.Fatalf("OnAvailable calls = %v, want [[b:1]]", got)
 	}
 }
+
+func TestTransientErrorIsNotNew(t *testing.T) {
+	step := 0
+	c := &Checker{results: map[string]Result{}}
+	c.check = func(_ context.Context, ref string) Result {
+		if step == 2 {
+			return Result{Ref: ref, Err: "timeout"}
+		}
+		return Result{Ref: ref, Available: step >= 1}
+	}
+	var calls int
+	c.OnAvailable = func([]Result) { calls++ }
+	for step = 0; step < 4; step++ { // known, new, registry error, available again
+		c.Check(context.Background(), []string{"a:1"})
+	}
+	if calls != 1 {
+		t.Fatalf("announced %d times, want 1", calls)
+	}
+}

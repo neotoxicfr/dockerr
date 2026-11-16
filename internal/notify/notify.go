@@ -51,13 +51,14 @@ type Notifier struct {
 
 // New checks the URLs; an empty one turns that channel off.
 func New(ntfyURL, ntfyToken, webhook string) (*Notifier, error) {
-	for _, u := range []string{ntfyURL, webhook} {
-		if u == "" {
+	for _, v := range [][2]string{{"DOCKERR_NTFY_URL", ntfyURL}, {"DOCKERR_WEBHOOK_URL", webhook}} {
+		if v[1] == "" {
 			continue
 		}
-		p, err := url.Parse(u)
+		// The URL itself stays out of the message: it may hold a secret.
+		p, err := url.Parse(v[1])
 		if err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" {
-			return nil, fmt.Errorf("URL de notification invalide : %s", u)
+			return nil, fmt.Errorf("%s : URL http(s) attendue", v[0])
 		}
 	}
 	if ntfyURL != "" {
@@ -111,6 +112,10 @@ func (n *Notifier) Notify(e Event) {
 		defer cancel()
 		if err := n.Send(ctx, e); err != nil {
 			slog.Warn("notification not sent", "event", e.Kind, "err", err)
+			// Not delivered: the next occurrence must not be silenced.
+			n.mu.Lock()
+			delete(n.last, key)
+			n.mu.Unlock()
 		}
 	}()
 }

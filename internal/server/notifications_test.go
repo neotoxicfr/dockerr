@@ -29,6 +29,7 @@ func TestDeaths(t *testing.T) {
 		{"clean exit", nil, msg("a", events.ActionDie, map[string]string{"exitCode": "0"}), now, ""},
 		{"stopped on purpose", []events.Message{msg("a", events.ActionKill, nil)}, msg("a", events.ActionDie, map[string]string{"exitCode": "137"}), now, ""},
 		{"stop long ago, then crash", []events.Message{msg("a", events.ActionStop, nil)}, msg("a", events.ActionDie, map[string]string{"exitCode": "2"}), now.Add(time.Minute), notify.Died},
+		{"crash right after a restart", []events.Message{msg("a", events.ActionKill, nil), msg("a", events.ActionDie, map[string]string{"exitCode": "137"}), msg("a", events.ActionStop, nil), msg("a", events.ActionStart, nil)}, msg("a", events.ActionDie, map[string]string{"exitCode": "1"}), now, notify.Died},
 		{"another container stopped", []events.Message{msg("b", events.ActionKill, nil)}, msg("a", events.ActionDie, map[string]string{"exitCode": "1"}), now, notify.Died},
 		{"oom", nil, msg("a", events.ActionOOM, nil), now, notify.OOM},
 		{"unhealthy", nil, msg("a", events.ActionHealthStatusUnhealthy, nil), now, notify.Unhealthy},
