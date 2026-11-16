@@ -1,0 +1,174 @@
+// Logs of one container, or of a stack's containers merged: live, with
+// search, a time window, errors only, pause and download.
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+const MAX = 10000; // lines kept in memory
+const out = $("#lg-out");
+const status = $("#lg-status");
+const multi = $$(".lg-ctr input").length > 1;
+let lines = []; // {c, t, e, m}
+let es = null, paused = false, pending = [], query = "", errOnly = false;
+let names = [];
+
+// ---- ANSI colours (SGR) → classes; other escapes dropped
+const SGR = /\x1b\[([0-9;]*)m/g;
+const OTHER = /\x1b\[[0-9;?]*[A-La-ln-z]|\x1b\][^\x07]*\x07/g;
+function ansi(text) {
+  text = text.replace(OTHER, "");
+  const parts = [];
+  let cls = { fg: "", b: false };
+  let last = 0;
+  for (const m of text.matchAll(SGR)) {
+    if (m.index > last) parts.push([text.slice(last, m.index), { ...cls }]);
+    for (const code of (m[1] || "0").split(";").map(Number)) {
+      if (code === 0) cls = { fg: "", b: false };
+      else if (code === 1) cls.b = true;
+      else if (code === 22) cls.b = false;
+      else if (code === 39) cls.fg = "";
+      else if ((code >= 30 && code <= 37) || (code >= 90 && code <= 97)) cls.fg = "a" + code;
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push([text.slice(last), { ...cls }]);
+  return parts;
+}
+
+const plain = (m) => m.replace(SGR, "").replace(OTHER, "");
+
+function lineEl(l) {
+  const el = document.createElement("div");
+  el.className = "ln" + (l.e ? " err" : "");
+  const time = document.createElement("span");
+  time.className = "t";
+  time.textContent = l.t ? new Date(l.t).toLocaleTimeString("fr-FR") : "";
+  el.append(time);
+  if (multi) {
+    const n = document.createElement("span");
+    n.className = "n c" + (l.c % 8);
+    n.textContent = names[l.c];
+    el.append(n);
+  }
+  const msg = document.createElement("span");
+  msg.className = "m";
+  for (const [txt, c] of ansi(l.m)) {
+    const s = document.createElement("span");
+    if (c.fg) s.classList.add(c.fg);
+    if (c.b) s.classList.add("b");
+    highlight(s, txt);
+    msg.append(s);
+  }
+  el.append(msg);
+  return el;
+}
+
+// highlight puts the text in s, the matches of the search in <mark>.
+function highlight(s, txt) {
+  if (!query) { s.textContent = txt; return; }
+  const low = txt.toLowerCase();
+  let i = 0, j;
+  while ((j = low.indexOf(query, i)) >= 0) {
+    if (j > i) s.append(txt.slice(i, j));
+    const mk = document.createElement("mark");
+    mk.textContent = txt.slice(j, j + query.length);
+    s.append(mk);
+    i = j + query.length;
+  }
+  if (i < txt.length) s.append(txt.slice(i));
+}
+
+const visible = (l) => (!errOnly || l.e) && (!query || plain(l.m).toLowerCase().includes(query));
+const atBottom = () => out.scrollHeight - out.scrollTop - out.clientHeight < 40;
+
+function append(batch) {
+  const stick = atBottom();
+  const frag = document.createDocumentFragment();
+  for (const l of batch) if (visible(l)) frag.append(lineEl(l));
+  out.append(frag);
+  while (out.childElementCount > MAX) out.firstElementChild.remove();
+  if (stick) out.scrollTop = out.scrollHeight;
+}
+
+function redraw() {
+  out.replaceChildren();
+  append(lines);
+  out.scrollTop = out.scrollHeight;
+  count();
+}
+
+function count() {
+  const shown = out.childElementCount;
+  status.textContent = `${shown} ligne${shown > 1 ? "s" : ""}` + (shown !== lines.length ? ` sur ${lines.length}` : "") +
+    (paused ? " · en pause" : es ? " · en direct" : "");
+}
+
+function selected() {
+  const boxes = $$(".lg-ctr input");
+  const all = boxes.length ? boxes : $$(".lg-one");
+  names = all.map((x) => x.dataset.name);
+  return all.map((x, i) => ({ id: x.dataset.id, i, on: boxes.length ? x.checked : true })).filter((x) => x.on);
+}
+
+function connect() {
+  if (es) es.close();
+  es = null;
+  lines = [];
+  pending = [];
+  out.replaceChildren();
+  const sel = selected();
+  if (!sel.length) { count(); return; }
+  const q = new URLSearchParams();
+  for (const s of sel) q.append("c", s.id);
+  const since = $("#lg-since").value;
+  if (since === "all") q.set("tail", "all");
+  else if (since) q.set("since", since);
+  // The server numbers containers in request order: map back to ours.
+  const index = sel.map((s) => s.i);
+  es = new EventSource("/logs/stream?" + q);
+  es.addEventListener("lines", (e) => {
+    // Containers' lines come mixed, each history in turn: sort each batch,
+    // and put a batch older than what is shown back in time order.
+    const byTime = (a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : 0);
+    const batch = JSON.parse(e.data).map((l) => ({ ...l, c: index[l.c] })).sort(byTime);
+    const older = lines.length > 0 && batch.length > 0 && batch[0].t < lines[lines.length - 1].t;
+    lines.push(...batch);
+    if (older) lines.sort(byTime);
+    if (lines.length > MAX) lines = lines.slice(-MAX);
+    if (older && !paused) redraw();
+    else if (paused) pending.push(...batch);
+    else append(batch);
+    count();
+  });
+  es.addEventListener("done", () => { es.close(); es = null; count(); });
+  es.onerror = () => { status.textContent = "Connexion perdue, nouvelle tentative…"; };
+  count();
+}
+
+let qTimer;
+$("#lg-q").addEventListener("input", (e) => {
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => { query = e.target.value.trim().toLowerCase(); redraw(); }, 150);
+});
+$("#lg-err").addEventListener("change", (e) => { errOnly = e.target.checked; redraw(); });
+$("#lg-since").addEventListener("change", connect);
+$$(".lg-ctr input").forEach((x) => x.addEventListener("change", connect));
+$("#lg-pause").addEventListener("click", (e) => {
+  paused = !paused;
+  const b = e.currentTarget;
+  $("use", b).setAttribute("href", paused ? "#i-play" : "#i-pause");
+  $("span", b).textContent = paused ? "Reprendre" : "Pause";
+  if (!paused) { append(pending); pending = []; }
+  count();
+});
+$("#lg-dl").addEventListener("click", () => {
+  const text = lines.filter(visible).map((l) =>
+    `${l.t || ""} ${multi ? names[l.c] + " " : ""}${l.e ? "[err] " : ""}${plain(l.m)}`).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text + "\n"], { type: "text/plain" }));
+  const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, "");
+  a.download = `logs-${$("h1 .name").textContent}-${stamp}.log`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+addEventListener("pagehide", () => es && es.close());
+connect();
