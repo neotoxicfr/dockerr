@@ -72,11 +72,30 @@ type Service struct {
 	DependsOn   []string `json:"depends_on"`
 	Secrets     []string `json:"secrets"`
 	Labels      []KV     `json:"labels"`
+	// Scalars and Lists hold the less common settings, by compose key.
+	Scalars     map[string]string `json:"scalars"`
+	Lists       map[string][]Item `json:"lists"`
+	Logging     Logging           `json:"logging"`
+	Healthcheck Healthcheck       `json:"healthcheck"`
 	// Locked fields can only change in text mode (aliases, merge keys,
 	// non-scalar values the form cannot show faithfully).
 	Locked []string `json:"locked"`
 	// Other keys present, edited in text mode.
 	Other []string `json:"other"`
+}
+
+type Logging struct {
+	Driver  string `json:"driver"`
+	Options []KV   `json:"options"`
+}
+
+// Healthcheck.Test is the shell command: CMD-SHELL, or a plain string.
+type Healthcheck struct {
+	Test        string `json:"test"`
+	Interval    string `json:"interval"`
+	Timeout     string `json:"timeout"`
+	Retries     string `json:"retries"`
+	StartPeriod string `json:"start_period"`
 }
 
 type Secret struct {
@@ -95,8 +114,16 @@ type Model struct {
 }
 
 // form fields of a service, in display order.
-var serviceFields = []string{"image", "build", "restart", "command", "network_mode", "ports", "volumes",
-	"environment", "env_file", "networks", "depends_on", "secrets", "labels"}
+var serviceFields = append([]string{"image", "build", "restart", "command", "network_mode", "ports", "volumes",
+	"environment", "env_file", "networks", "depends_on", "secrets", "labels", "logging", "healthcheck"},
+	append(slices.Clone(scalarFields), listFields...)...)
+
+// scalarFields and listFields are the settings shown in "more settings".
+var (
+	scalarFields = []string{"container_name", "hostname", "user", "working_dir", "entrypoint", "mem_limit", "cpus",
+		"shm_size", "stop_grace_period", "privileged", "read_only", "init"}
+	listFields = []string{"cap_add", "cap_drop", "devices", "extra_hosts", "dns", "tmpfs", "security_opt"}
+)
 
 func (d *Doc) Model() Model {
 	m := Model{Services: []Service{}, Secrets: []Secret{}, Networks: []string{}, Volumes: []string{}, Other: []string{}}
@@ -141,7 +168,8 @@ func (d *Doc) Model() Model {
 }
 
 func service(name string, n *yaml.Node) Service {
-	s := Service{Name: name, Locked: []string{}, Other: []string{}}
+	s := Service{Name: name, Locked: []string{}, Other: []string{}, Scalars: map[string]string{}, Lists: map[string][]Item{},
+		Logging: Logging{Options: []KV{}}}
 	n0 := n
 	n = resolve(n)
 	if n.Kind != yaml.MappingNode {
@@ -214,6 +242,54 @@ func service(name string, n *yaml.Node) Service {
 			s.Secrets = names(v)
 			if hasMapping(v) {
 				s.Locked = append(s.Locked, k)
+			}
+		case "logging":
+			if v.Kind != yaml.MappingNode || hasNonScalarExcept(v, "options") {
+				s.Locked = append(s.Locked, k)
+				break
+			}
+			s.Logging.Driver = scalar(get(v, "driver"))
+			if o := get(v, "options"); o != nil {
+				kv, ok := kvs(resolve(o))
+				if !ok {
+					s.Locked = append(s.Locked, k)
+				}
+				s.Logging.Options = kv
+			}
+		case "healthcheck":
+			if v.Kind != yaml.MappingNode || hasNonScalarExcept(v, "test") {
+				s.Locked = append(s.Locked, k)
+				break
+			}
+			h := &s.Healthcheck
+			h.Interval, h.Timeout = scalar(get(v, "interval")), scalar(get(v, "timeout"))
+			h.Retries, h.StartPeriod = scalar(get(v, "retries")), scalar(get(v, "start_period"))
+			t := resolve(get(v, "test"))
+			switch {
+			case t == nil:
+			case t.Kind == yaml.ScalarNode:
+				h.Test = t.Value
+			case t.Kind == yaml.SequenceNode && len(t.Content) == 2 && t.Content[0].Value == "CMD-SHELL":
+				h.Test = t.Content[1].Value
+			default:
+				var parts []string
+				for _, c := range t.Content {
+					parts = append(parts, quoteArg(c.Value))
+				}
+				h.Test = strings.Join(parts, " ")
+				s.Locked = append(s.Locked, k) // exec form: text mode
+			}
+		default:
+			if slices.Contains(scalarFields, k) {
+				if v.Kind != yaml.ScalarNode {
+					s.Locked = append(s.Locked, k)
+				}
+				s.Scalars[k] = scalar(v)
+			} else if slices.Contains(listFields, k) {
+				if v.Kind != yaml.SequenceNode {
+					s.Locked = append(s.Locked, k) // mapping syntax (extra_hosts): text mode
+				}
+				s.Lists[k] = items(v)
 			}
 		}
 	}
@@ -307,6 +383,17 @@ func names(v *yaml.Node) []string {
 	return out
 }
 
+// hasNonScalarExcept reports a mapping value that is not a scalar, key
+// except aside.
+func hasNonScalarExcept(m *yaml.Node, except string) bool {
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value != except && resolve(m.Content[i+1]).Kind != yaml.ScalarNode {
+			return true
+		}
+	}
+	return false
+}
+
 func hasNonEmptyValues(v *yaml.Node) bool {
 	for i := 1; i < len(v.Content); i += 2 {
 		if c := resolve(v.Content[i]); c.Kind != yaml.ScalarNode || (c.Value != "" && c.Tag != "!!null") {
@@ -388,6 +475,23 @@ func (d *Doc) apply(e Edit) error {
 		n := str(v)
 		if old != nil && old.Kind == yaml.ScalarNode {
 			old.Value, old.Tag, old.Style = n.Value, n.Tag, n.Style
+			return nil
+		}
+		put(parent, key, n)
+		return nil
+	case "scalar":
+		// Like set, but plain and untagged: true, 3 or 0.5 keep their type.
+		var v string
+		if err := json.Unmarshal(e.Value, &v); err != nil {
+			return errors.New("valeur attendue : texte")
+		}
+		if v == "" {
+			del(parent, key)
+			return nil
+		}
+		n := &yaml.Node{Kind: yaml.ScalarNode, Value: v}
+		if old != nil && old.Kind == yaml.ScalarNode {
+			old.Value, old.Tag, old.Style = n.Value, "", 0
 			return nil
 		}
 		put(parent, key, n)
