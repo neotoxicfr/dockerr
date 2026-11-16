@@ -16,7 +16,7 @@
   <thead><tr><th class="pick"></th><th>Nom</th><th>État</th><th>Image</th><th>Pile</th><th class="num">CPU</th><th class="num">Mémoire</th></tr></thead>
   <tbody>{{range $d.Containers}}
   <tr data-text="{{.Name}} {{.Image}} {{.Project}}">
-    <td class="pick"><input type="checkbox" data-sel="{{short .ID}}" data-label="{{.Name}}" aria-label="Sélectionner {{.Name}}"></td>
+    <td class="pick">{{if not (isSelf .)}}<input type="checkbox" data-sel="{{short .ID}}" data-label="{{.Name}}" aria-label="Sélectionner {{.Name}}">{{end}}</td>
     <td><a class="cell-name" href="/c/{{short .ID}}"><span class="dot {{ctrClass .}}"></span>{{.Name}}</a></td>
     <td class="muted">{{ctrLabel .}}</td>
     <td class="mono muted" title="{{.Image}}">{{imageTag .Image}}</td>

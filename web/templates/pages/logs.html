@@ -18,6 +18,7 @@
     <button class="btn" id="lg-pause" type="button"><svg class="i s"><use href="#i-pause"/></svg><span>Pause</span></button>
     <button class="btn" id="lg-dl" type="button"><svg class="i s"><use href="#i-download"/></svg>Télécharger</button>
   </div>
+  {{if gt (len $d.Containers) 30}}<p class="faint small">Les 30 premiers conteneurs sont cochés : 30 au plus à la fois.</p>{{end}}
   {{if gt (len $d.Containers) 1}}<div class="logs-ctrs">{{range $i, $c := $d.Containers}}
     <label class="lg-ctr c{{$i}}"><input type="checkbox" {{if lt $i 30}}checked{{end}} data-id="{{$c.ID}}" data-name="{{logName $c}}"><span class="dot {{ctrClass $c}}"></span>{{logName $c}}</label>{{end}}
   </div>{{else}}{{range $d.Containers}}<input type="hidden" class="lg-one" data-id="{{.ID}}" data-name="{{logName .}}">{{end}}{{end}}

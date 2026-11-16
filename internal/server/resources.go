@@ -238,6 +238,7 @@ type kv struct{ K, V string }
 
 type ctrView struct {
 	*stacks.Container
+	Self         bool // dockerr's own container: no stop, pause or remove
 	Cmd          string
 	Created      string
 	Started      string
@@ -285,7 +286,7 @@ func (s *Server) containerPage(w http.ResponseWriter, r *http.Request) {
 	}
 	in := res.Container
 	v := ctrView{Container: c, Created: isoDate(in.Created), RestartCount: in.RestartCount, Children: netdeps.Children(c, all),
-		DozzleURL: s.cfg.DozzleURL, ExecEnabled: s.cfg.ExecEnabled && s.docker.Caps.Exec}
+		DozzleURL: s.cfg.DozzleURL, ExecEnabled: s.cfg.ExecEnabled && s.docker.Caps.Exec, Self: isSelf(c)}
 	if in.State != nil {
 		v.Started = isoDate(in.State.StartedAt)
 	}
@@ -345,6 +346,11 @@ func (s *Server) containerAction(w http.ResponseWriter, r *http.Request) {
 	}
 	c, _, ok := s.findContainer(w, r)
 	if !ok {
+		return
+	}
+	// Stopping, pausing or removing dockerr from dockerr cuts the tool off.
+	if a := r.FormValue("action"); a != "start" && isSelf(c) {
+		jsonError(w, http.StatusConflict, "c'est le conteneur de dockerr : cette action l'arrêterait en cours de route")
 		return
 	}
 	ctx := r.Context()

@@ -38,9 +38,11 @@ bar.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-bulk-op]");
   if (!b || running) return;
   const op = b.dataset.bulkOp;
-  const keys = [...picked.keys()];
+  // The selection as it is now: it may change while the requests run.
+  const snap = new Map(picked);
+  const keys = [...snap.keys()];
   if (CONFIRM.has(op)) {
-    const names = [...picked.values()].join(", ");
+    const names = [...snap.values()].join(", ");
     if (!(await confirmAsk(`${LABELS[op]} ${keys.length} ${kind === "stacks" ? "pile(s)" : "conteneur(s)"} ?`, names, LABELS[op]))) return;
   }
   running = true;
@@ -51,11 +53,11 @@ bar.addEventListener("click", async (e) => {
     : post(`/c/${encodeURIComponent(k)}/action`, { action: op })));
   b.classList.remove("busy");
   running = false;
-  const failed = results.map((r, i) => (r.ok ? null : `${picked.get(keys[i])} : ${r.body.error || "échec"}`)).filter(Boolean);
+  const failed = results.map((r, i) => (r.ok ? null : `${snap.get(keys[i])} : ${r.body.error || "échec"}`)).filter(Boolean);
   const done = results.length - failed.length;
   if (done) toast(`${done} ${kind === "stacks" ? "opération(s) lancée(s)" : "action(s) faite(s)"}`);
   if (failed.length) toast(failed.join(" · "), true);
-  picked.clear();
+  for (const k of keys) picked.delete(k);
   sync();
   if (kind === "containers") setTimeout(() => location.reload(), 800);
 });
