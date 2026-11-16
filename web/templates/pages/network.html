@@ -7,17 +7,18 @@
 <div class="netmap-wrap">
 <table class="netmap" id="netmap">
   <thead><tr>
-    <th scope="col"><span class="faint small">Conteneur</span></th>
+    <th scope="col" class="stk"><span class="faint small">Pile</span></th>
+    <th scope="col" class="who"><span class="faint small">Conteneur</span></th>
     {{range $i, $c := $m.Cols}}<th scope="col" data-col="{{$i}}"><span class="bus-h">{{$c.Name}}
       <small>{{if eq $c.Name "host"}}hôte{{else}}{{$c.Driver}}{{end}} · {{$c.Count}}</small>
       {{if $c.Internal}}<span class="badge plain">interne</span>{{else}}<span class="badge-sp"></span>{{end}}</span></th>{{end}}
   </tr></thead>
   <tbody>
-  {{range $m.Groups}}
-    <tr class="grp"><th scope="rowgroup">{{if .Stack}}{{.Stack}}{{else}}Hors compose{{end}}</th>{{range $m.Cols}}<td class="bus{{if eq .Name "host"}} host{{end}}"></td>{{end}}</tr>
-    {{range .Rows}}{{$r := .}}
-    <tr>
-      <th scope="row">
+  {{range $g := $m.Groups}}
+    {{range $i, $r := .Rows}}
+    <tr{{if eq $i 0}} class="first"{{end}}>
+      {{if eq $i 0}}<th scope="rowgroup" class="stk" rowspan="{{len $g.Rows}}">{{if $g.Stack}}<a href="/s/{{$g.Stack}}">{{$g.Stack}}</a>{{else}}<span class="faint">hors compose</span>{{end}}</th>{{end}}
+      <th scope="row" class="who">
         <div class="ctr"><span class="dot {{ctrClass $r.C}}"></span><a href="/c/{{short $r.C.ID}}">{{$r.C.Name}}</a></div>
         {{if $r.Missing}}<div class="kids"><span class="lost">réseau de {{$r.Missing}} introuvable</span></div>{{end}}
         {{if $r.Children}}<div class="kids">{{range $r.Children}}<div class="ctr"><span class="dot {{ctrClass .}}"></span><a href="/c/{{short .ID}}">{{.Name}}</a>{{if .NetLost}}<span class="lost">perdu</span>{{end}}</div>{{end}}</div>{{end}}
