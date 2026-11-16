@@ -187,7 +187,7 @@ Each stack is a folder under `DOCKERR_STACKS_DIR` holding `compose.yaml`,
 | `DOCKERR_NTFY_URL` | — | ntfy topic for notifications, e.g. `https://ntfy.sh/my-topic` |
 | `DOCKERR_NTFY_TOKEN` / `DOCKERR_NTFY_TOKEN_FILE` | — | ntfy access token, or a file holding it |
 | `DOCKERR_WEBHOOK_URL` | — | URL receiving each notification as JSON |
-| `DOCKERR_API_KEYS_FILE` | — | SHA-256 hashes of the keys allowed to read `GET /api/status` (see below) |
+| `DOCKERR_API_KEYS_FILE` | — | SHA-256 hashes of the keys allowed to read `GET /api/status` or `GET /metrics`, or to start a check (see below) |
 | `DOCKERR_DATA_DIR` | `/data` | SQLite database: history, preferences, terminal log |
 | `DOCKERR_LISTEN` | `:8080` | |
 | `DOCKERR_INSECURE_NOAUTH` | `false` | no authentication, local development only |
@@ -214,6 +214,25 @@ instead, which starts an image update check (HEAD requests to the registries,
 no pull, nothing restarted; at most once every 5 minutes, 429 otherwise). Each
 key has one scope: the check key cannot read the status, and the other way
 round.
+
+### Prometheus metrics
+
+`GET /metrics` exposes the Prometheus text format (`dockerr_` prefix): stacks
+and containers by state, CPU and memory of each running container, services
+with an image update, time of the last update check, containers that lost their
+shared network, and operations kept in the database by kind and result (over
+the 90-day retention, not since start). It needs a key with `scope=metrics` in
+`DOCKERR_API_KEYS_FILE`, made like the others (a status or check key gets 401);
+answers are cached for 15 s.
+
+```yaml
+scrape_configs:
+  - job_name: dockerr
+    authorization:
+      credentials_file: /etc/prometheus/dockerr_key   # the key itself, not its hash
+    static_configs:
+      - targets: ["dockerr:8080"]
+```
 
 ### Socket proxy rights
 
