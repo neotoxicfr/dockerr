@@ -104,9 +104,15 @@ jobs:
           # Merge this reviewed commit only: a later push needs its own review.
           for _ in $(seq 1 110); do
             sleep 30
-            read -r state head <<< "$(gh pr view "$PR" --json state,headRefOid \
-              --jq '"\(.state) \(.headRefOid)"' || true)"
+            read -r state head mergeable <<< "$(gh pr view "$PR" --json state,headRefOid,mergeable \
+              --jq '"\(.state) \(.headRefOid) \(.mergeable)"' || true)"
             [ "$state" = OPEN ] && [ "$head" = "$SHA" ] || exit 0
+            # A conflict with dev waits for a rebase, and the new commit for
+            # its own review: no point in trying to merge until then.
+            if [ "$mergeable" = CONFLICTING ]; then
+              gh pr comment "$PR" --body "Conflit avec dev pour ${SHA:0:7} : PR laissée ouverte, à recaler." || true
+              exit 0
+            fi
             checks=$(gh pr checks "$PR" --required --json bucket \
               --jq 'if any(.[]; .bucket == "fail") then "fail"
                     elif length > 0 and all(.[]; .bucket == "pass" or .bucket == "skipping")
