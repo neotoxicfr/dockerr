@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -98,7 +99,10 @@ func run() error {
 	}
 	srv.Background(ctx)
 
-	hs := &http.Server{Addr: cfg.Listen, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	// Requests live in ctx: on SIGTERM, long streams (logs, events) end at
+	// once instead of holding the shutdown for its full timeout.
+	hs := &http.Server{Addr: cfg.Listen, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second,
+		BaseContext: func(net.Listener) context.Context { return ctx }}
 	errc := make(chan error, 1)
 	go func() { errc <- hs.ListenAndServe() }()
 	slog.Info("dockerr listening", "addr", cfg.Listen, "stacks", cfg.StacksDir, "version", server.Version)

@@ -797,12 +797,14 @@ dialog[open] { animation: rise 0.16s ease-out; }
 .logs-out .a32, .logs-out .a92 { color: var(--ok); }
 .logs-out .a33, .logs-out .a93 { color: var(--warn); }
 .logs-out .a34, .logs-out .a94, .logs-out .a36, .logs-out .a96 { color: var(--accent); }
-.logs-out .a35, .logs-out .a95 { color: color-mix(in srgb, #c792ea 70%, var(--text)); }
+/* Log palette: mixed with the text colour, readable in both themes. */
+.logs { --log-a35: color-mix(in srgb, #c792ea 70%, var(--text)); --log-c0: color-mix(in srgb, #5ac8fa 70%, var(--text)); --log-c1: color-mix(in srgb, #5fd0a0 70%, var(--text)); --log-c2: color-mix(in srgb, #f0a868 70%, var(--text)); --log-c3: color-mix(in srgb, #c792ea 70%, var(--text)); --log-c4: color-mix(in srgb, #ef7f73 70%, var(--text)); --log-c5: color-mix(in srgb, #82aaff 70%, var(--text)); --log-c6: color-mix(in srgb, #e6c07b 70%, var(--text)); --log-c7: color-mix(in srgb, #89ddff 70%, var(--text)); }
+.logs-out .a35, .logs-out .a95 { color: var(--log-a35); }
 .logs-out .a37, .logs-out .a97 { color: var(--text); }
-.logs-out .n.c0, .lg-ctr.c0 { color: color-mix(in srgb, #5ac8fa 70%, var(--text)); } .logs-out .n.c1, .lg-ctr.c1 { color: color-mix(in srgb, #5fd0a0 70%, var(--text)); }
-.logs-out .n.c2, .lg-ctr.c2 { color: color-mix(in srgb, #f0a868 70%, var(--text)); } .logs-out .n.c3, .lg-ctr.c3 { color: color-mix(in srgb, #c792ea 70%, var(--text)); }
-.logs-out .n.c4, .lg-ctr.c4 { color: color-mix(in srgb, #ef7f73 70%, var(--text)); } .logs-out .n.c5, .lg-ctr.c5 { color: color-mix(in srgb, #82aaff 70%, var(--text)); }
-.logs-out .n.c6, .lg-ctr.c6 { color: color-mix(in srgb, #e6c07b 70%, var(--text)); } .logs-out .n.c7, .lg-ctr.c7 { color: color-mix(in srgb, #89ddff 70%, var(--text)); }
+.logs-out .n.c0, .lg-ctr.c0 { color: var(--log-c0); } .logs-out .n.c1, .lg-ctr.c1 { color: var(--log-c1); }
+.logs-out .n.c2, .lg-ctr.c2 { color: var(--log-c2); } .logs-out .n.c3, .lg-ctr.c3 { color: var(--log-c3); }
+.logs-out .n.c4, .lg-ctr.c4 { color: var(--log-c4); } .logs-out .n.c5, .lg-ctr.c5 { color: var(--log-c5); }
+.logs-out .n.c6, .lg-ctr.c6 { color: var(--log-c6); } .logs-out .n.c7, .lg-ctr.c7 { color: var(--log-c7); }
 .logs-status { color: var(--faint); font-size: var(--fs-s); }
 @media (max-width: 760px) {
   .logs { height: calc(100dvh - 190px - var(--tab-h)); }
