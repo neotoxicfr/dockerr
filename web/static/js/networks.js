@@ -70,7 +70,8 @@ submitted(dlg, form, async () => {
       // The old network was put back under a new ID: the page shows the
       // removed one, so reload it whenever the form closes.
       editing = r.body.id;
-      dlg.addEventListener("close", () => location.reload(), { once: true });
+      if (dlg.open) dlg.addEventListener("close", () => location.reload(), { once: true });
+      else location.reload(); // closed while the request ran
     }
     toast(r.body.error || "Échec", true);
     return false;
