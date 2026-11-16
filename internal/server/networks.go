@@ -32,6 +32,9 @@ var netNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$`)
 // predefined networks belong to Docker itself.
 var predefined = map[string]bool{"bridge": true, "host": true, "none": true}
 
+// formDrivers are the drivers the form can create and change.
+var formDrivers = map[string]bool{"bridge": true, "macvlan": true, "ipvlan": true}
+
 // options checks the form and turns it into Docker's create options.
 func (n netSpec) options() (client.NetworkCreateOptions, error) {
 	var o client.NetworkCreateOptions
@@ -144,6 +147,8 @@ func (s *Server) editable(ctx context.Context, id string) (network.Inspect, erro
 		return n, fmt.Errorf("%s appartient à la pile %s : modifie-le dans son compose", n.Name, n.Labels[api.ProjectLabel])
 	case len(n.Containers) > 0:
 		return n, fmt.Errorf("%s est utilisé par %d conteneur(s) : déconnecte-les d'abord", n.Name, len(n.Containers))
+	case !formDrivers[n.Driver]:
+		return n, fmt.Errorf("le pilote %s ne se modifie pas ici", n.Driver)
 	}
 	return n, nil
 }
@@ -182,6 +187,7 @@ func (s *Server) networkRecreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
+	keepUnshown(&o, old)
 	if _, err := s.docker.API.NetworkRemove(ctx, old.ID, client.NetworkRemoveOptions{}); err != nil {
 		jsonError(w, http.StatusBadGateway, err.Error())
 		return
@@ -189,14 +195,37 @@ func (s *Server) networkRecreate(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.docker.API.NetworkCreate(ctx, spec.Name, o); err != nil {
 		back := client.NetworkCreateOptions{Driver: old.Driver, Internal: old.Internal, Attachable: old.Attachable,
 			EnableIPv6: &old.EnableIPv6, IPAM: &old.IPAM, Options: old.Options, Labels: old.Labels}
-		if _, rerr := s.docker.API.NetworkCreate(ctx, old.Name, back); rerr != nil {
+		res, rerr := s.docker.API.NetworkCreate(ctx, old.Name, back)
+		if rerr != nil {
 			jsonError(w, http.StatusBadGateway, fmt.Sprintf("%v ; l'ancien réseau n'a pas pu être remis : %v", err, rerr))
 			return
 		}
-		jsonError(w, http.StatusBadGateway, err.Error()+" ; l'ancien réseau est remis")
+		// The old network is back under a new ID: the form must target it.
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error() + " ; l'ancien réseau est remis", "id": res.ID})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"name": spec.Name})
+}
+
+// keepUnshown carries over what the form does not show: labels, the
+// attachable flag, driver options other than parent, the IPAM driver.
+func keepUnshown(o *client.NetworkCreateOptions, old network.Inspect) {
+	o.Labels, o.Attachable = old.Labels, old.Attachable
+	for k, v := range old.Options {
+		if k == "parent" {
+			continue
+		}
+		if o.Options == nil {
+			o.Options = map[string]string{}
+		}
+		o.Options[k] = v
+	}
+	if (old.IPAM.Driver != "" && old.IPAM.Driver != "default") || len(old.IPAM.Options) > 0 {
+		if o.IPAM == nil {
+			o.IPAM = &network.IPAM{}
+		}
+		o.IPAM.Driver, o.IPAM.Options = old.IPAM.Driver, old.IPAM.Options
+	}
 }
 
 type netAttach struct {

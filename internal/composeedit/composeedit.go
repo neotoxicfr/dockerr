@@ -210,6 +210,9 @@ func service(name string, n *yaml.Node) Service {
 				s.Command = scalar(v)
 			}
 		case "ports", "volumes":
+			if hasAnchoredItem(v) {
+				s.Locked = append(s.Locked, k)
+			}
 			items := items(v)
 			if k == "ports" {
 				s.Ports = items
@@ -286,8 +289,8 @@ func service(name string, n *yaml.Node) Service {
 				}
 				s.Scalars[k] = scalar(v)
 			} else if slices.Contains(listFields, k) {
-				if v.Kind != yaml.SequenceNode {
-					s.Locked = append(s.Locked, k) // mapping syntax (extra_hosts): text mode
+				if v.Kind != yaml.SequenceNode || hasAnchoredItem(v) {
+					s.Locked = append(s.Locked, k) // mapping syntax (extra_hosts), anchors: text mode
 				}
 				s.Lists[k] = items(v)
 			}
@@ -381,6 +384,20 @@ func names(v *yaml.Node) []string {
 		out = append(out, v.Value)
 	}
 	return out
+}
+
+// hasAnchoredItem reports a sequence item that is an alias or carries an
+// anchor: replacing the list would leave dangling references.
+func hasAnchoredItem(v *yaml.Node) bool {
+	if v.Kind != yaml.SequenceNode {
+		return false
+	}
+	for _, c := range v.Content {
+		if c.Kind == yaml.AliasNode || c.Anchor != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // hasNonScalarExcept reports a mapping value that is not a scalar, key
@@ -477,6 +494,7 @@ func (d *Doc) apply(e Edit) error {
 			old.Value, old.Tag, old.Style = n.Value, n.Tag, n.Style
 			return nil
 		}
+		keepComments(old, n)
 		put(parent, key, n)
 		return nil
 	case "scalar":
@@ -494,6 +512,7 @@ func (d *Doc) apply(e Edit) error {
 			old.Value, old.Tag, old.Style = n.Value, "", 0
 			return nil
 		}
+		keepComments(old, n)
 		put(parent, key, n)
 		return nil
 	case "list":
@@ -502,8 +521,8 @@ func (d *Doc) apply(e Edit) error {
 			return errors.New("valeur attendue : liste de textes")
 		}
 		vs = slices.DeleteFunc(vs, func(s string) bool { return strings.TrimSpace(s) == "" })
-		if old != nil && hasMapping(old) {
-			return ErrLocked // long syntax entries would be lost
+		if old != nil && (hasMapping(old) || hasAnchoredItem(old)) {
+			return ErrLocked // long syntax entries, or anchors others refer to, would be lost
 		}
 		if len(vs) == 0 {
 			del(parent, key)

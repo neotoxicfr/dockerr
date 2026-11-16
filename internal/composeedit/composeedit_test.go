@@ -182,7 +182,7 @@ func TestModelNoNull(t *testing.T) {
 	}
 }
 
-func TestMoreSettings(t *testing.T) {
+func TestMoreSettingsModel(t *testing.T) {
 	src := `services:
   app:
     image: nginx:1.27
@@ -191,7 +191,7 @@ func TestMoreSettings(t *testing.T) {
     cpus: 0.5
     cap_add: [NET_ADMIN]
     extra_hosts:
-      gw: 10.0.0.1
+      gw: 192.0.2.1
     logging:
       driver: json-file
       options:
@@ -201,6 +201,7 @@ func TestMoreSettings(t *testing.T) {
       retries: 3
   exec:
     image: busybox:1.37
+    cap_drop: [&c ALL]
     healthcheck:
       test: ["CMD", "true"]
 `
@@ -208,47 +209,72 @@ func TestMoreSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := d.Model()
-	app, exec := m.Services[0], m.Services[1]
-	if app.Scalars["container_name"] != "web" || app.Scalars["privileged"] != "true" || app.Scalars["cpus"] != "0.5" {
-		t.Errorf("scalars = %v", app.Scalars)
+	svc := map[string]Service{}
+	for _, s := range d.Model().Services {
+		svc[s.Name] = s
 	}
-	if len(app.Lists["cap_add"]) != 1 || app.Lists["cap_add"][0].Value != "NET_ADMIN" {
-		t.Errorf("cap_add = %v", app.Lists["cap_add"])
+	app, exec := svc["app"], svc["exec"]
+	cases := []struct {
+		name string
+		ok   bool
+	}{
+		{"scalars", app.Scalars["container_name"] == "web" && app.Scalars["privileged"] == "true" && app.Scalars["cpus"] == "0.5"},
+		{"list", len(app.Lists["cap_add"]) == 1 && app.Lists["cap_add"][0].Value == "NET_ADMIN"},
+		{"logging", app.Logging.Driver == "json-file" && len(app.Logging.Options) == 1 && app.Logging.Options[0].Value == "10m"},
+		{"healthcheck CMD-SHELL", app.Healthcheck.Test == "curl -f http://localhost || exit 1" && app.Healthcheck.Retries == "3"},
+		{"extra_hosts mapping locked", slices.Contains(app.Locked, "extra_hosts")},
+		{"healthcheck CMD-SHELL editable", !slices.Contains(app.Locked, "healthcheck")},
+		{"healthcheck exec form locked", slices.Contains(exec.Locked, "healthcheck")},
+		{"anchored list item locked", slices.Contains(exec.Locked, "cap_drop")},
+		{"nothing left for text mode", len(app.Other) == 0},
 	}
-	if app.Logging.Driver != "json-file" || len(app.Logging.Options) != 1 || app.Logging.Options[0].Value != "10m" {
-		t.Errorf("logging = %+v", app.Logging)
-	}
-	if app.Healthcheck.Test != "curl -f http://localhost || exit 1" || app.Healthcheck.Retries != "3" {
-		t.Errorf("healthcheck = %+v", app.Healthcheck)
-	}
-	if !slices.Contains(app.Locked, "extra_hosts") || slices.Contains(app.Locked, "healthcheck") {
-		t.Errorf("app locked = %v (extra_hosts as a mapping only)", app.Locked)
-	}
-	if !slices.Contains(exec.Locked, "healthcheck") {
-		t.Errorf("exec form healthcheck must be locked: %v", exec.Locked)
-	}
-	if len(app.Other) != 0 {
-		t.Errorf("other = %v", app.Other)
-	}
-
-	err = d.Apply([]Edit{
-		{Op: "scalar", Path: []string{"services", "app", "read_only"}, Value: json.RawMessage(`"true"`)},
-		{Op: "scalar", Path: []string{"services", "app", "privileged"}, Value: json.RawMessage(`""`)},
-		{Op: "set", Path: []string{"services", "exec", "logging", "driver"}, Value: json.RawMessage(`"local"`)},
-		{Op: "map", Path: []string{"services", "exec", "logging", "options"}, Value: json.RawMessage(`[{"key":"max-file","value":"3"}]`)},
-		{Op: "list", Path: []string{"services", "exec", "dns"}, Value: json.RawMessage(`["1.1.1.1"]`)},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	out := d.String()
-	for _, want := range []string{"read_only: true\n", "driver: local", `max-file: "3"`, "- 1.1.1.1"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("missing %q in:\n%s", want, out)
+	for _, c := range cases {
+		if !c.ok {
+			t.Errorf("%s: app=%+v exec=%+v", c.name, app, exec)
 		}
 	}
-	if strings.Contains(out, "privileged") {
-		t.Errorf("privileged not removed:\n%s", out)
+}
+
+func TestMoreSettingsEdits(t *testing.T) {
+	src := "services:\n  app:\n    image: nginx:1.27\n    privileged: true\n    healthcheck:\n      test: [\"CMD-SHELL\", \"true\"] # local check\n    cap_drop: [&c ALL]\n"
+	cases := []struct {
+		name    string
+		edit    Edit
+		want    string // in the output
+		gone    string // not in the output
+		wantErr bool
+	}{
+		{"bool stays a bool", Edit{Op: "scalar", Path: []string{"services", "app", "read_only"}, Value: json.RawMessage(`"true"`)}, "read_only: true\n", "", false},
+		{"empty removes", Edit{Op: "scalar", Path: []string{"services", "app", "privileged"}, Value: json.RawMessage(`""`)}, "", "privileged", false},
+		{"nested set", Edit{Op: "set", Path: []string{"services", "app", "logging", "driver"}, Value: json.RawMessage(`"local"`)}, "driver: local", "", false},
+		{"nested map", Edit{Op: "map", Path: []string{"services", "app", "logging", "options"}, Value: json.RawMessage(`[{"key":"max-file","value":"3"}]`)}, `max-file: "3"`, "", false},
+		{"list", Edit{Op: "list", Path: []string{"services", "app", "dns"}, Value: json.RawMessage(`["192.0.2.53"]`)}, "- 192.0.2.53", "", false},
+		{"replacing a sequence keeps its comment", Edit{Op: "set", Path: []string{"services", "app", "healthcheck", "test"}, Value: json.RawMessage(`"curl -f http://localhost"`)}, "# local check", "", false},
+		{"anchored list refused", Edit{Op: "list", Path: []string{"services", "app", "cap_drop"}, Value: json.RawMessage(`["NET_RAW"]`)}, "", "", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			d, err := Parse(src)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = d.Apply([]Edit{c.edit})
+			if c.wantErr {
+				if !errors.Is(err, ErrLocked) {
+					t.Fatalf("err = %v, want ErrLocked", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			out := d.String()
+			if c.want != "" && !strings.Contains(out, c.want) {
+				t.Errorf("missing %q in:\n%s", c.want, out)
+			}
+			if c.gone != "" && strings.Contains(out, c.gone) {
+				t.Errorf("%q still in:\n%s", c.gone, out)
+			}
+		})
 	}
 }
