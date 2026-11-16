@@ -20,7 +20,7 @@
       <button class="btn" data-check-updates>Vérifier</button>
     </div>
     <div class="setting">
-      <div class="txt"><strong>Mise à jour automatique</strong><span>Chaque jour à {{$d.AutoAt}} (<code>DOCKERR_AUTOUPDATE_AT</code>) · {{if $d.AutoStacks}}{{range $i, $n := $d.AutoStacks}}{{if $i}}, {{end}}{{$n}}{{end}}{{else}}aucune pile : l'activer sur la page d'une pile, ou avec le label <code>dockerr.autoupdate: "true"</code>{{end}}</span></div>
+      <div class="txt"><strong>Mise à jour automatique</strong><span>Chaque jour à {{$d.AutoAt}} (<code>DOCKERR_AUTOUPDATE_AT</code>) · {{if $d.AutoUnknown}}liste illisible pour l'instant{{else if $d.AutoStacks}}{{range $i, $n := $d.AutoStacks}}{{if $i}}, {{end}}{{$n}}{{end}}{{else}}aucune pile : l'activer sur la page d'une pile, ou avec le label <code>dockerr.autoupdate: "true"</code>{{end}}</span></div>
     </div>
     <div class="setting">
       <div class="txt"><strong>Notifications</strong><span>{{if $d.Notify}}{{range $i, $t := $d.Notify}}{{if $i}} · {{end}}{{$t}}{{end}}{{else}}Désactivées : <code>DOCKERR_NTFY_URL</code> ou <code>DOCKERR_WEBHOOK_URL</code>{{end}}</span></div>

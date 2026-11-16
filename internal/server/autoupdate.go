@@ -86,6 +86,11 @@ func (s *Server) autoUpdate(ctx context.Context) {
 		slog.Warn("auto update skipped: the Docker proxy does not allow compose")
 		return
 	}
+	// A check already running (started by hand) would make this one return
+	// at once with stale results: wait for it first.
+	if !s.updates.WaitIdle(ctx) {
+		return
+	}
 	s.updates.Check(ctx, s.imageRefs(ctx))
 	_, list, err := s.snapshot(ctx)
 	if err != nil {
@@ -109,12 +114,18 @@ func (s *Server) autoUpdate(ctx context.Context) {
 				st = x
 			}
 		}
+		if ctx.Err() != nil {
+			return // shutting down: no new operation, no summary
+		}
 		op, err := s.runner.Run(st, ops.Update, t.Service, autoUser)
 		if err != nil {
 			slog.Info("auto update skipped", "stack", t.Stack, "service", t.Service, "err", err)
 			continue
 		}
 		snap := s.waitOp(ctx, op)
+		if !snap.Done {
+			return // the wait was cut short: its outcome is unknown
+		}
 		name := t.Stack
 		if t.Service != "" {
 			name += " · " + t.Service

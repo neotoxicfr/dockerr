@@ -148,6 +148,7 @@ type stackData struct {
 	// AutoUpdate is the stack's opt-in; AutoLabel is set when a service
 	// opts in with the dockerr.autoupdate label.
 	AutoUpdate, AutoLabel bool
+	AutoUnknown           bool // the opt-in could not be read: show no state
 	AutoAt                string
 }
 
@@ -178,6 +179,8 @@ func (s *Server) stackData(r *http.Request, st *stacks.Stack, all []*stacks.Cont
 	}
 	if names, err := s.store.AutoUpdates(r.Context()); err == nil {
 		d.AutoUpdate = slices.Contains(names, st.Name)
+	} else {
+		d.AutoUnknown = true
 	}
 	d.AutoAt = fmt.Sprintf("%02d:%02d", s.cfg.AutoUpdateHour, s.cfg.AutoUpdateMinute)
 	d.AutoLabel = slices.ContainsFunc(st.Services, labeled)
@@ -640,6 +643,7 @@ type settingsData struct {
 	StackNames                      []string
 	AutoAt                          string   // daily time of automatic updates
 	AutoStacks                      []string // stacks opted in, by setting or label
+	AutoUnknown                     bool     // the opt-ins could not be read
 }
 
 type capView struct {
@@ -661,11 +665,13 @@ func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 	d.Notify = s.notifier.Targets()
 	d.Alerts, _ = s.store.LogAlerts(r.Context())
 	d.AutoAt = fmt.Sprintf("%02d:%02d", s.cfg.AutoUpdateHour, s.cfg.AutoUpdateMinute)
-	opted, _ := s.store.AutoUpdates(r.Context())
+	opted, err := s.store.AutoUpdates(r.Context())
+	d.AutoUnknown = err != nil
 	if _, list, err := s.snapshot(r.Context()); err == nil {
 		for _, st := range list {
 			d.StackNames = append(d.StackNames, st.Name)
-			if !st.Self && (slices.Contains(opted, st.Name) || slices.ContainsFunc(st.Services, labeled)) {
+			// Without a compose file a stack cannot be updated: not listed.
+			if !st.Self && st.File != "" && (slices.Contains(opted, st.Name) || slices.ContainsFunc(st.Services, labeled)) {
 				d.AutoStacks = append(d.AutoStacks, st.Name)
 			}
 		}
