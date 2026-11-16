@@ -180,7 +180,11 @@ func (e *Events) Loop(ctx context.Context) {
 	// just after the last one seen, nothing is lost while (re)subscribing.
 	// The start is the daemon's clock, which may differ from ours.
 	since := time.Now()
-	if info, err := e.api.Info(ctx, client.InfoOptions{}); err == nil {
+	// Bounded: a daemon that never answers would keep the loop from subscribing.
+	ictx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	info, err := e.api.Info(ictx, client.InfoOptions{})
+	cancel()
+	if err == nil {
 		if t, err := time.Parse(time.RFC3339Nano, info.Info.SystemTime); err == nil {
 			since = t
 		}
