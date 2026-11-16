@@ -740,6 +740,12 @@ async function bump() {
   const svc = q.get("bump"), from = q.get("from"), to = q.get("to");
   if (!svc || !from || !to || !editable) return;
   history.replaceState(null, "", location.pathname + "?tab=compose");
+  // From a link: only the tag may change, never the image itself.
+  const repo = (ref) => { const i = ref.lastIndexOf(":"); return i > ref.lastIndexOf("/") ? ref.slice(0, i) : ref; };
+  const tag = to.slice(repo(to).length + 1);
+  if (repo(to) !== repo(from) || !/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(tag)) {
+    return toast("Lien de mise à jour invalide", true);
+  }
   const s = st.model && st.model.services.find((x) => x.name === svc);
   if (!s || s.image !== from || s.locked.includes("image")) {
     return toast(`L'image de ${svc} n'est pas écrite telle quelle dans le compose (variable…) : change-la en texte`, true);
