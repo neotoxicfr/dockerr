@@ -26,6 +26,11 @@ type Result struct {
 type Checker struct {
 	api client.APIClient
 	reg *registry
+	// OnAvailable, when set, receives the images found newer since the
+	// previous check (not on the first one: dockerr just started).
+	OnAvailable func([]Result)
+	// check looks one image up: checkOne, replaced in tests.
+	check func(context.Context, string) Result
 
 	mu      sync.RWMutex
 	results map[string]Result
@@ -34,7 +39,9 @@ type Checker struct {
 }
 
 func New(api client.APIClient, creds Credentials) *Checker {
-	return &Checker{api: api, reg: newRegistry(creds), results: map[string]Result{}}
+	c := &Checker{api: api, reg: newRegistry(creds), results: map[string]Result{}}
+	c.check = c.checkOne
+	return c
 }
 
 // Get returns the last result for an image reference.
@@ -72,6 +79,10 @@ func (c *Checker) Check(ctx context.Context, refs []string) {
 		c.mu.Unlock()
 	}()
 
+	c.mu.RLock()
+	first := c.last.IsZero()
+	c.mu.RUnlock()
+	var fresh []Result
 	seen := map[string]bool{}
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(4)
@@ -81,8 +92,11 @@ func (c *Checker) Check(ctx context.Context, refs []string) {
 		}
 		seen[ref] = true
 		g.Go(func() error {
-			r := c.checkOne(gctx, ref)
+			r := c.check(gctx, ref)
 			c.mu.Lock()
+			if r.Available && !c.results[ref].Available {
+				fresh = append(fresh, r)
+			}
 			c.results[ref] = r
 			c.mu.Unlock()
 			return nil
@@ -90,6 +104,9 @@ func (c *Checker) Check(ctx context.Context, refs []string) {
 	}
 	_ = g.Wait()
 	slog.Info("updates checked", "images", len(seen))
+	if !first && len(fresh) > 0 && c.OnAvailable != nil {
+		c.OnAvailable(fresh)
+	}
 }
 
 func (c *Checker) checkOne(ctx context.Context, ref string) Result {

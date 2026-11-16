@@ -19,6 +19,10 @@
       <div class="txt"><strong>Mises à jour des images</strong><span>{{if $d.Checking}}Vérification en cours{{else if $d.LastCheck.IsZero}}Pas encore vérifiées{{else}}Vérifiées {{since $d.LastCheck}}{{end}}</span></div>
       <button class="btn" data-check-updates>Vérifier</button>
     </div>
+    <div class="setting">
+      <div class="txt"><strong>Notifications</strong><span>{{if $d.Notify}}{{range $i, $t := $d.Notify}}{{if $i}} · {{end}}{{$t}}{{end}}{{else}}Désactivées : <code>DOCKERR_NTFY_URL</code> ou <code>DOCKERR_WEBHOOK_URL</code>{{end}}</span></div>
+      {{if $d.Notify}}<button class="btn" data-notify-test>Envoyer un test</button>{{end}}
+    </div>
   </section>
 
   <section>

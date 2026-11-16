@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 
 	"github.com/neotoxicfr/dockerr/internal/config"
 	"github.com/neotoxicfr/dockerr/internal/docker"
+	"github.com/neotoxicfr/dockerr/internal/notify"
 	"github.com/neotoxicfr/dockerr/internal/ops"
 	"github.com/neotoxicfr/dockerr/internal/server"
 	"github.com/neotoxicfr/dockerr/internal/stacks"
@@ -72,8 +74,13 @@ func run() error {
 		return a.Username, a.Password
 	}
 	upd := updates.New(d.API, creds)
+	notifier, err := notify.New(cfg.NtfyURL, cfg.NtfyToken, cfg.WebhookURL)
+	if err != nil {
+		return err
+	}
 	runner.OnDone = func(o ops.Snapshot) {
 		events.Notify()
+		notifyOp(notifier, o)
 		rec := store.Operation{ID: o.ID, Stack: o.Stack, Service: o.Service, Kind: string(o.Kind), User: o.User,
 			Started: o.Started, Ended: o.Ended, Err: o.Err}
 		for _, t := range o.Tasks {
@@ -85,7 +92,7 @@ func run() error {
 	}
 
 	srv, err := server.New(server.Deps{Config: cfg, Docker: d, Stacks: mgr, Runner: runner, Store: st,
-		Updates: upd, Stats: docker.NewStats(d.API), Events: events})
+		Updates: upd, Stats: docker.NewStats(d.API), Events: events, Notify: notifier})
 	if err != nil {
 		return err
 	}
@@ -131,4 +138,26 @@ func healthcheck() int {
 		return 1
 	}
 	return 0
+}
+
+// notifyOp reports a failed operation, and the shared networks it repaired.
+func notifyOp(n *notify.Notifier, o ops.Snapshot) {
+	what := o.Stack
+	if o.Service != "" {
+		what = o.Stack + " · " + o.Service
+	}
+	if o.Err != "" {
+		n.Notify(notify.Event{Kind: notify.OpFailed, Stack: o.Stack, Container: o.Service, Priority: 4,
+			Title: "Échec : " + strings.ToLower(o.Label) + " · " + what, Message: o.Err + " (par " + o.User + ")"})
+	}
+	var fixed []string
+	for _, t := range o.Tasks {
+		if t.Status == "done" && (strings.HasPrefix(t.Text, "Reconnecté") || t.Text == "Recréé") {
+			fixed = append(fixed, strings.TrimPrefix(t.ID, "Réseau "))
+		}
+	}
+	if len(fixed) > 0 {
+		n.Notify(notify.Event{Kind: notify.Repaired, Stack: o.Stack, Priority: 3,
+			Title: "Réseau partagé réparé : " + o.Stack, Message: strings.Join(fixed, ", ") + " a retrouvé son réseau."})
+	}
 }

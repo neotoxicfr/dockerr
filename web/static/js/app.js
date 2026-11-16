@@ -259,6 +259,14 @@ document.addEventListener("click", async (e) => {
     setTimeout(() => chk.classList.remove("busy"), 3000);
     return;
   }
+  const nt = e.target.closest("[data-notify-test]");
+  if (nt) {
+    nt.classList.add("busy");
+    const r = await post("/notify/test");
+    nt.classList.remove("busy");
+    toast(r.ok ? "Notification envoyée" : r.body.error || "Échec", !r.ok);
+    return;
+  }
   const pr = e.target.closest("[data-prune]");
   if (pr) {
     if (!(await confirmAsk(pr.dataset.confirm, "", "Supprimer"))) return;

@@ -61,6 +61,10 @@ another container's network**, like apps routed through a VPN container.
   the result and compose's full output, per stack and for all stacks (kept 90
   days).
 - **New stack** from a pasted compose file.
+- **Notifications** to ntfy and/or any webhook (JSON): a container that
+  crashes (not one stopped on purpose), runs out of memory or turns
+  unhealthy, new images, a failed operation, a shared network repaired. The
+  same event is sent at most once every 10 minutes; Settings sends a test.
 - **Logs** stay with [Dozzle](https://dozzle.dev): set `DOCKERR_DOZZLE_URL` for
   a link on every container.
 
@@ -170,6 +174,9 @@ Each stack is a folder under `DOCKERR_STACKS_DIR` holding `compose.yaml`,
 | `DOCKERR_EXEC` | `false` | container terminal (also needs `EXEC=1` on the proxy) |
 | `DOCKERR_UPDATE_INTERVAL` | `6h` | image update checks |
 | `DOCKERR_REPAIR_NETDEPS` | `true` | repair lost network namespaces after operations |
+| `DOCKERR_NTFY_URL` | — | ntfy topic for notifications, e.g. `https://ntfy.sh/my-topic` |
+| `DOCKERR_NTFY_TOKEN` / `DOCKERR_NTFY_TOKEN_FILE` | — | ntfy access token, or a file holding it |
+| `DOCKERR_WEBHOOK_URL` | — | URL receiving each notification as JSON |
 | `DOCKERR_API_KEYS_FILE` | — | SHA-256 hashes of the keys allowed to read `GET /api/status` (see below) |
 | `DOCKERR_DATA_DIR` | `/data` | SQLite database: history, preferences, terminal log |
 | `DOCKERR_LISTEN` | `:8080` | |
