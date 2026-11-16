@@ -6,7 +6,10 @@
     {{if $st.Total}}<a class="btn" href="/s/{{$st.Name}}/logs" title="Logs de la pile"><svg class="i s"><use href="#i-logs"/></svg><span class="lbl">Logs</span></a>{{end}}
     {{if $st.Self}}<span class="pill" title="Les opérations sur cette pile arrêteraient dockerr">Pile de dockerr</span>{{else}}
     {{if $st.Updates}}<button class="btn primary" data-op="update" data-stack="{{$st.Name}}" {{if not $caps.Compose}}aria-disabled="true"{{end}}><svg class="i s"><use href="#i-update"/></svg>Mettre à jour</button>{{end}}
-    {{if eq $st.Up 0}}
+    {{if eq $st.State "paused"}}
+    <button class="btn primary" data-op="unpause" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-play"/></svg>Reprendre</button>
+    <button class="btn" data-op="stop" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-stop"/></svg>Arrêter</button>
+    {{else if eq $st.Up 0}}
     <button class="btn {{if not $st.Updates}}primary{{end}}" data-op="start" data-stack="{{$st.Name}}" {{if not $st.File}}aria-disabled="true"{{end}}><svg class="i s"><use href="#i-play"/></svg>Démarrer</button>
     {{else}}
     <button class="btn" data-op="restart" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-restart"/></svg>Redémarrer</button>
@@ -68,6 +71,10 @@
     {{if not $st.Self}}
     {{if and $c $c.Running}}
     <button class="btn ghost" data-op="restart" data-stack="{{$st.Name}}" data-service="{{$s.Name}}" title="Redémarrer" aria-label="Redémarrer {{$s.Name}}"><svg class="i"><use href="#i-restart"/></svg><span class="lbl">Redémarrer</span></button>
+    <button class="btn ghost" data-op="pause" data-stack="{{$st.Name}}" data-service="{{$s.Name}}" title="Pause" aria-label="Pause {{$s.Name}}"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">Pause</span></button>
+    <button class="btn ghost" data-op="stop" data-stack="{{$st.Name}}" data-service="{{$s.Name}}" title="Arrêter" aria-label="Arrêter {{$s.Name}}"><svg class="i"><use href="#i-stop"/></svg><span class="lbl">Arrêter</span></button>
+    {{else if and $c $c.Paused}}
+    <button class="btn ghost" data-op="unpause" data-stack="{{$st.Name}}" data-service="{{$s.Name}}" title="Reprendre" aria-label="Reprendre {{$s.Name}}"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Reprendre</span></button>
     <button class="btn ghost" data-op="stop" data-stack="{{$st.Name}}" data-service="{{$s.Name}}" title="Arrêter" aria-label="Arrêter {{$s.Name}}"><svg class="i"><use href="#i-stop"/></svg><span class="lbl">Arrêter</span></button>
     {{else}}
     <button class="btn ghost" data-op="start" data-stack="{{$st.Name}}" data-service="{{$s.Name}}" title="Démarrer" aria-label="Démarrer {{$s.Name}}"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Démarrer</span></button>

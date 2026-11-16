@@ -38,6 +38,7 @@ const (
 	Partial State = "partial"
 	Stopped State = "stopped"
 	Problem State = "problem"
+	Paused  State = "paused" // paused, none running
 )
 
 type Stack struct {
@@ -104,6 +105,7 @@ type Port struct {
 }
 
 func (c *Container) Running() bool { return c.State == string(container.StateRunning) }
+func (c *Container) Paused() bool  { return c.State == string(container.StatePaused) }
 
 type Manager struct {
 	Docker *docker.Docker
@@ -328,7 +330,7 @@ func (st *Stack) service(name string) *Service {
 func (st *Stack) summarize() {
 	sort.SliceStable(st.Services, func(i, j int) bool { return st.Services[i].Name < st.Services[j].Name })
 	st.Up, st.Total = 0, 0
-	problem := false
+	problem, paused := false, 0
 	for _, s := range st.Services {
 		st.Total++
 		up := false
@@ -337,6 +339,8 @@ func (st *Stack) summarize() {
 			case c.Running():
 				up = true
 				problem = problem || c.Health == "unhealthy" || c.NetLost
+			case c.Paused():
+				paused++
 			case c.State == string(container.StateRestarting), c.State == string(container.StateDead):
 				problem = true
 			case c.State == string(container.StateExited) && s.OneShot:
@@ -352,6 +356,8 @@ func (st *Stack) summarize() {
 	switch {
 	case st.LoadErr != "" || problem:
 		st.State = Problem
+	case st.Up == 0 && paused > 0:
+		st.State = Paused
 	case st.Up == 0:
 		st.State = Stopped
 	case st.Up < st.Total:

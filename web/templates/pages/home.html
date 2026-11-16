@@ -15,4 +15,13 @@
   {{if $d.Updates}}<button role="tab" data-filter="updates">Mises à jour <span class="n">{{$d.Updates}}</span></button>{{end}}
 </div></div>
 <div class="list" id="stack-list" data-live="/stacks/rows">{{template "stack-rows" .}}</div>
+<div class="bulk card" id="bulk" data-bulk="stacks" hidden>
+  <span class="bulk-n"></span>
+  <button class="btn" data-bulk-op="start"><svg class="i s"><use href="#i-play"/></svg>Démarrer</button>
+  <button class="btn" data-bulk-op="restart"><svg class="i s"><use href="#i-restart"/></svg>Redémarrer</button>
+  <button class="btn" data-bulk-op="update"><svg class="i s"><use href="#i-update"/></svg>Mettre à jour</button>
+  <button class="btn" data-bulk-op="stop"><svg class="i s"><use href="#i-stop"/></svg>Arrêter</button>
+  <button class="btn ghost" data-bulk-clear>Annuler</button>
+</div>
+<script type="module" src="/static/js/bulk.js?v={{.Version}}"></script>
 {{end}}

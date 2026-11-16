@@ -226,7 +226,7 @@ function applyFilter() {
   for (const row of $$("#stack-list .row")) {
     const st = row.dataset.state;
     const okF = filter === "all" ||
-      (filter === "attention" && (st === "problem" || st === "partial")) ||
+      (filter === "attention" && (st === "problem" || st === "partial" || st === "paused")) ||
       (filter === "updates" && row.dataset.upd) || st === filter;
     row.hidden = !okF || (q && !row.dataset.name.includes(q));
   }
