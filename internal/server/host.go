@@ -157,7 +157,9 @@ func (s *Server) dispatch(w http.ResponseWriter, r *http.Request) {
 	h := s.hostOf(r)
 	// A change goes to the host of the page it comes from: the cookie is
 	// shared by every tab, and another tab may have switched it since.
-	if name := r.Header.Get("X-Dockerr-Host"); name != "" && r.Method != http.MethodGet && r.Method != http.MethodHead {
+	// Pages send it with every change and every live refresh; navigation
+	// (no header) follows the cookie.
+	if name := r.Header.Get("X-Dockerr-Host"); name != "" {
 		h = nil
 		for _, x := range s.hosts {
 			if x.Name == name {
@@ -295,7 +297,7 @@ func (s *Server) watchHosts(ctx context.Context) {
 					b, err := h.Connect(cctx)
 					cancel()
 					if err == nil {
-						s.bind(h, b).loops(ctx)
+						s.bind(h, b).loops(ctx, false)
 						slog.Info("docker host connected", "host", h.Name, "endpoint", h.Endpoint)
 					} else if h.lastErr() != err.Error() {
 						slog.Warn("docker host unreachable", "host", h.Name, "endpoint", h.Endpoint, "err", err)

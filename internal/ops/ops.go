@@ -355,7 +355,7 @@ func (r *Runner) recreate(ctx context.Context, op *Op, c *stacks.Container) erro
 	}
 	file := r.Stacks.LabelFile(c.Labels)
 	if file == "" {
-		return errors.New("fichier compose inconnu")
+		return errors.New("fichier compose introuvable ou hors du dossier des piles de cet hôte : à recréer à la main")
 	}
 	project, err := r.Stacks.Load(ctx, c.Project, file)
 	if err != nil {

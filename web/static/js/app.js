@@ -208,7 +208,10 @@ function refreshLive() {
     for (const el of $$("[data-live]")) {
       if ($(".menu:not([hidden])", el) || document.hidden) continue;
       try {
-        const r = await fetch(el.dataset.live, { headers: { Accept: "text/html" } });
+        // The page's host: a refresh must not bring another tab's host in.
+        const headers = { Accept: "text/html" };
+        if (pageHost) headers["X-Dockerr-Host"] = pageHost;
+        const r = await fetch(el.dataset.live, { headers });
         if (!r.ok) continue;
         const html = await r.text();
         if ($(".menu:not([hidden])", el)) continue;

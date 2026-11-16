@@ -3,8 +3,8 @@ package docker
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
-	"strconv"
 	"sync"
 	"time"
 
@@ -177,11 +177,18 @@ func (e *Events) Notify() {
 func (e *Events) Loop(ctx context.Context) {
 	backoff := time.Second
 	// Docker replays events since a time: from the loop's start, then from
-	// the last one seen, nothing is lost while (re)subscribing.
+	// just after the last one seen, nothing is lost while (re)subscribing.
+	// The start is the daemon's clock, which may differ from ours.
 	since := time.Now()
+	if info, err := e.api.Info(ctx, client.InfoOptions{}); err == nil {
+		if t, err := time.Parse(time.RFC3339Nano, info.Info.SystemTime); err == nil {
+			since = t
+		}
+	}
 	for ctx.Err() == nil {
 		f := make(client.Filters).Add("type", "container", "image", "network", "volume")
-		res := e.api.Events(ctx, client.EventsListOptions{Filters: f, Since: strconv.FormatInt(since.Unix(), 10)})
+		// seconds.nanoseconds: what was already seen is not sent again.
+		res := e.api.Events(ctx, client.EventsListOptions{Filters: f, Since: sinceArg(since)})
 		start := time.Now()
 	read:
 		for {
@@ -217,4 +224,10 @@ func (e *Events) Loop(ctx context.Context) {
 		}
 		backoff = min(backoff*2, 30*time.Second)
 	}
+}
+
+// sinceArg is Docker's "seconds.nanoseconds", just after t.
+func sinceArg(t time.Time) string {
+	t = t.Add(time.Nanosecond)
+	return fmt.Sprintf("%d.%09d", t.Unix(), t.Nanosecond())
 }

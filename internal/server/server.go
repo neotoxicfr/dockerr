@@ -416,12 +416,13 @@ func (s *Server) eventStream(w http.ResponseWriter, r *http.Request) {
 
 // Background starts the loops the server depends on, for every host.
 func (s *Server) Background(ctx context.Context) {
-	s.loops(ctx)
+	s.loops(ctx, true)
 	s.watchHosts(ctx)
 }
 
 // loops starts what this server's host needs running.
-func (s *Server) loops(ctx context.Context) {
+// startup: the server is not listening yet, orphan file helpers can go.
+func (s *Server) loops(ctx context.Context, startup bool) {
 	go s.stats.Loop(ctx)
 	if s.docker.Caps.Events {
 		go s.events.Loop(ctx)
@@ -443,7 +444,9 @@ func (s *Server) loops(ctx context.Context) {
 	// Events first, so none is missed meanwhile; still before the server
 	// listens: a helper created by an early request must not be taken for
 	// an orphan and removed under it.
-	if s.docker.Caps.Containers && s.docker.Caps.Write {
+	// Only at start: a host connecting later may share its daemon with
+	// another one whose requests have helpers in use.
+	if startup && s.docker.Caps.Containers && s.docker.Caps.Write {
 		hctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		s.removeHelpers(hctx)
 		cancel()
