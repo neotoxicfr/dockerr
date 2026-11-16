@@ -50,23 +50,40 @@ func TestNetSpecOptions(t *testing.T) {
 }
 
 func TestKeepUnshown(t *testing.T) {
-	old := network.Inspect{Network: network.Network{
+	base := network.Network{
 		Labels: map[string]string{"team": "a"}, Attachable: true,
 		Options: map[string]string{"com.docker.network.driver.mtu": "1400", "parent": "eth1"},
-		IPAM:    network.IPAM{Driver: "default"},
-	}}
-	o, err := netSpec{Name: "lan", Driver: "macvlan", Parent: "eth0"}.options()
-	if err != nil {
-		t.Fatal(err)
 	}
-	keepUnshown(&o, old)
-	if o.Labels["team"] != "a" || !o.Attachable || o.Options["com.docker.network.driver.mtu"] != "1400" {
-		t.Errorf("lost settings: %+v", o)
+	cases := []struct {
+		name     string
+		ipam     network.IPAM
+		subnet   string // in the form
+		wantIPAM string // IPAM driver expected in the result ("" = no IPAM block)
+	}{
+		{"default IPAM, none in form", network.IPAM{Driver: "default"}, "", ""},
+		{"custom IPAM driver kept", network.IPAM{Driver: "custom"}, "", "custom"},
+		{"IPAM options kept with the form's subnet", network.IPAM{Driver: "default", Options: map[string]string{"x": "y"}}, "198.51.100.0/24", "default"},
 	}
-	if o.Options["parent"] != "eth0" {
-		t.Errorf("parent = %q, the form's value must win", o.Options["parent"])
-	}
-	if o.IPAM != nil {
-		t.Errorf("default IPAM driver must not create an IPAM block: %+v", o.IPAM)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			old := network.Inspect{Network: base}
+			old.IPAM = c.ipam
+			o, err := netSpec{Name: "lan", Driver: "macvlan", Parent: "eth0", Subnet: c.subnet}.options()
+			if err != nil {
+				t.Fatal(err)
+			}
+			keepUnshown(&o, old)
+			if o.Labels["team"] != "a" || !o.Attachable || o.Options["com.docker.network.driver.mtu"] != "1400" || o.Options["parent"] != "eth0" {
+				t.Errorf("options = %+v", o)
+			}
+			switch {
+			case c.wantIPAM == "" && o.IPAM != nil:
+				t.Errorf("unexpected IPAM %+v", o.IPAM)
+			case c.wantIPAM != "" && (o.IPAM == nil || o.IPAM.Driver != c.wantIPAM):
+				t.Errorf("IPAM = %+v, want driver %s", o.IPAM, c.wantIPAM)
+			case c.subnet != "" && len(o.IPAM.Config) != 1:
+				t.Errorf("form subnet lost: %+v", o.IPAM)
+			}
+		})
 	}
 }

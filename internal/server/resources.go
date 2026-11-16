@@ -51,8 +51,9 @@ type networkRow struct {
 	Members                   []netMember
 	// Editable: dockerr may recreate or remove it (not Docker's own, not
 	// declared by a compose file, no container on it).
-	Editable bool
-	Subnet4  kv // first IPv4 subnet → gateway, to prefill the form
+	Editable  bool
+	Removable bool // Editable, whatever the driver
+	Subnet4   kv // first IPv4 subnet → gateway, to prefill the form
 	Subnet6  string
 	Parent   string // host interface of a macvlan or ipvlan network
 }
@@ -197,7 +198,8 @@ func (s *Server) networkRows(ctx context.Context, all []*stacks.Container) ([]ne
 			sort.Slice(row.Members, func(i, j int) bool { return row.Members[i].Name < row.Members[j].Name })
 			row.Parent = in.Network.Options["parent"]
 			// Only what was read in full can be changed.
-			row.Editable = !predefined[n.Name] && row.Project == "" && len(row.Members) == 0 && formDrivers[n.Driver]
+			row.Removable = !predefined[n.Name] && row.Project == "" && len(row.Members) == 0
+			row.Editable = row.Removable && formDrivers[n.Driver]
 		}
 		out = append(out, row)
 	}
