@@ -688,6 +688,9 @@ details[open] > summary { border-bottom: 1px solid var(--line); }
 .setting .txt { flex: 1; min-width: 0; }
 .setting .txt strong { display: block; font-weight: 550; }
 .setting .txt span { color: var(--muted); font-size: 13px; }
+.alert-new input { flex: 1; min-width: 0; }
+.alert-new select { width: auto; }
+@media (max-width: 600px) { .alert-new { flex-wrap: wrap; } .alert-new input { flex-basis: 100%; } }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 .field-row .field input { max-width: none; }
 @media (max-width: 600px) { .field-row { grid-template-columns: 1fr; } }

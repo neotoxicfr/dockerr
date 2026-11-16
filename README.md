@@ -69,6 +69,8 @@ another container's network**, like apps routed through a VPN container.
   crashes (not one stopped on purpose), runs out of memory or turns
   unhealthy, new images, a failed operation, a shared network repaired. The
   same event is sent at most once every 10 minutes; Settings sends a test.
+- **Log alerts**: a text (any case) or a `/regexp/`, for one stack or all;
+  a matching line in a running container's logs sends a notification.
 - **Logs**, live, for a container or a whole stack merged in time order:
   colours, search with highlights, last lines or a time window, errors only,
   pause, download, stopped containers too. `DOCKERR_DOZZLE_URL` still adds a
