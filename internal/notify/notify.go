@@ -24,6 +24,7 @@ const (
 	Update    = "update_available"
 	OpFailed  = "operation_failed"
 	Repaired  = "network_repaired"
+	LogAlert  = "log_alert"
 	Test      = "test"
 )
 
@@ -187,6 +188,8 @@ func tag(kind string) string {
 		return "warning"
 	case Update:
 		return "arrow_up"
+	case LogAlert:
+		return "mag"
 	case Repaired:
 		return "wrench"
 	}

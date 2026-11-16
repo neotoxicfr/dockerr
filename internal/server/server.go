@@ -45,6 +45,8 @@ type Server struct {
 	events  *docker.Events
 	// notifier may be nil: notifications off.
 	notifier *notify.Notifier
+	// alertsNudge wakes the log watcher when the alert rules change.
+	alertsNudge chan struct{}
 
 	pages  map[string]*template.Template
 	static fs.FS
@@ -64,7 +66,7 @@ type Deps struct {
 
 func New(d Deps) (*Server, error) {
 	s := &Server{cfg: d.Config, docker: d.Docker, stacks: d.Stacks, runner: d.Runner, store: d.Store,
-		updates: d.Updates, stats: d.Stats, events: d.Events, notifier: d.Notify}
+		updates: d.Updates, stats: d.Stats, events: d.Events, notifier: d.Notify, alertsNudge: make(chan struct{}, 1)}
 	if s.notifier.Enabled() {
 		dw := &deaths{stopped: map[string]time.Time{}}
 		s.events.OnContainer = func(m events.Message) {
@@ -153,6 +155,8 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /settings", s.settings)
 	mux.HandleFunc("POST /notify/test", s.notifyTest)
+	mux.HandleFunc("POST /settings/alerts", s.alertAdd)
+	mux.HandleFunc("POST /settings/alerts/{id}/delete", s.alertDelete)
 	mux.HandleFunc("GET /operations", s.operations)
 	mux.HandleFunc("POST /settings/mode", s.setMode)
 	mux.HandleFunc("POST /prefs", s.setPref)
@@ -408,6 +412,9 @@ func (s *Server) Background(ctx context.Context) {
 		}()
 	}
 	go s.updates.Loop(ctx, s.cfg.UpdateInterval, s.imageRefs)
+	if s.notifier.Enabled() {
+		go s.logWatch(ctx)
+	}
 }
 
 func (s *Server) imageRefs(ctx context.Context) []string {

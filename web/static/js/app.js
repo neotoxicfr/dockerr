@@ -259,6 +259,12 @@ document.addEventListener("click", async (e) => {
     setTimeout(() => chk.classList.remove("busy"), 3000);
     return;
   }
+  const ad = e.target.closest("[data-alert-delete]");
+  if (ad) {
+    const r = await post(`/settings/alerts/${ad.dataset.alertDelete}/delete`);
+    if (!r.ok) return toast(r.body.error || "Échec", true);
+    return location.reload();
+  }
   const nt = e.target.closest("[data-notify-test]");
   if (nt) {
     if (nt.classList.contains("busy")) return;
@@ -370,3 +376,14 @@ if (map) {
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 
 window.dockerr = { toast, confirmAsk, post, follow };
+
+// ---- log alerts (settings)
+const alertForm = $("#alert-form");
+if (alertForm) {
+  alertForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const r = await post("/settings/alerts", { pattern: alertForm.pattern.value, stack: alertForm.stack.value }, true);
+    if (!r.ok) return toast(r.body.error || "Échec", true);
+    location.reload();
+  });
+}

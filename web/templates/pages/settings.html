@@ -26,6 +26,24 @@
   </section>
 
   <section>
+    <h2 class="section">Alertes de logs</h2>
+    <div class="card">
+      {{if not $d.Notify}}<p class="setting faint">Les alertes partent par les notifications : configure d'abord <code>DOCKERR_NTFY_URL</code> ou <code>DOCKERR_WEBHOOK_URL</code>.</p>{{end}}
+      {{range $d.Alerts}}
+      <div class="setting">
+        <div class="txt"><strong class="mono">{{.Pattern}}</strong><span>{{if .Stack}}pile {{.Stack}}{{else}}toutes les piles{{end}} · {{.By}}</span></div>
+        <button class="btn ghost sm" data-alert-delete="{{.ID}}" aria-label="Supprimer l'alerte {{.Pattern}}"><svg class="i s"><use href="#i-trash"/></svg></button>
+      </div>
+      {{end}}
+      <form class="setting alert-new" id="alert-form">
+        <input name="pattern" required maxlength="500" placeholder="texte, ex. ERROR, ou /regexp/" class="mono" autocomplete="off" spellcheck="false" aria-label="Motif">
+        <select name="stack" aria-label="Pile"><option value="">toutes les piles</option>{{range $d.StackNames}}<option>{{.}}</option>{{end}}</select>
+        <button class="btn" type="submit"><svg class="i s"><use href="#i-plus"/></svg>Ajouter</button>
+      </form>
+    </div>
+  </section>
+
+  <section>
     <h2 class="section">Accès Docker</h2>
     <div class="card">
       <div class="kv">
