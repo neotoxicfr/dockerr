@@ -1,5 +1,6 @@
 {{define "stack-rows"}}{{$d := .Data}}{{$caps := .Caps}}
 {{if $d.Err}}<div class="error-box">{{$d.Err}}</div>{{end}}
+{{if $d.Stacks}}<div class="row-head" aria-hidden="true"><span></span><span></span><span>Pile</span><span class="num">Services</span><span class="num cpu">CPU</span><span class="num mem">Mémoire</span><span></span><span class="act"></span></div>{{end}}
 {{range $d.Stacks}}
 <div class="row" data-name="{{.Name}}" data-state="{{.State}}" {{if .Updates}}data-upd="1"{{end}}>
   <label class="pick">{{if not .Self}}<input type="checkbox" data-sel="{{.Name}}" aria-label="Sélectionner {{.Name}}">{{end}}</label>
