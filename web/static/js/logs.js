@@ -107,8 +107,14 @@ function count() {
     (frozen ? " · en pause" : es ? " · en direct" : "");
 }
 
+// On a phone the container list starts folded: the lines need the height.
+const pick = $("#lg-pick");
+if (pick && matchMedia("(max-width: 760px)").matches) pick.open = false;
+
 function selected() {
   const boxes = $$(".lg-ctr input");
+  const pn = $("#lg-pick-n");
+  if (pn) pn.textContent = boxes.filter((x) => x.checked).length + "/" + boxes.length;
   const all = boxes.length ? boxes : $$(".lg-one");
   names = all.map((x) => x.dataset.name);
   return all.map((x, i) => ({ id: x.dataset.id, i, on: boxes.length ? x.checked : true })).filter((x) => x.on);
