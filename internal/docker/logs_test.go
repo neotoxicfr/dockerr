@@ -29,10 +29,10 @@ func TestParseLogLine(t *testing.T) {
 }
 
 func TestScanLongLines(t *testing.T) {
-	huge := strings.Repeat("é", 1<<20) // 2 MiB, two bytes per character
+	huge := "a" + strings.Repeat("é", 1<<20) // odd offset: the cut falls inside a character
 	in := "2026-11-16T07:00:00Z " + huge + "\n2026-11-16T07:00:01Z next\nlast without newline"
 	out := make(chan LogLine, 8)
-	if err := scanLines(t.Context(), strings.NewReader(in), 3, true, out); err != nil {
+	if err := scanLines(t.Context(), strings.NewReader(in), 3, true, maxLine, out); err != nil {
 		t.Fatal(err)
 	}
 	close(out)
@@ -45,5 +45,34 @@ func TestScanLongLines(t *testing.T) {
 	}
 	if !strings.HasSuffix(got[0].M, " …") || !utf8.ValidString(got[0].M) || len(got[0].M) > maxLine+8 {
 		t.Errorf("long line: %d bytes, valid UTF-8 %v", len(got[0].M), utf8.ValidString(got[0].M))
+	}
+}
+
+func TestAlertLimitKeepsLongLines(t *testing.T) {
+	in := "2026-11-16T07:00:00Z " + strings.Repeat("x", 20000) + " warning\n"
+	out := make(chan LogLine, 1)
+	if err := scanLines(t.Context(), strings.NewReader(in), 0, false, 1<<20, out); err != nil {
+		t.Fatal(err)
+	}
+	if l := <-out; !strings.HasSuffix(l.M, "warning") {
+		t.Errorf("a pattern past the display limit was cut: %d bytes", len(l.M))
+	}
+}
+
+func TestLastLongLineWithoutNewline(t *testing.T) {
+	out := make(chan LogLine, 2)
+	if err := scanLines(t.Context(), strings.NewReader(strings.Repeat("x", 64<<10)), 0, false, maxLine, out); err != nil {
+		t.Fatal(err)
+	}
+	close(out)
+	n := 0
+	for l := range out {
+		n++
+		if !strings.HasSuffix(l.M, " …") {
+			t.Errorf("not cut: %d bytes", len(l.M))
+		}
+	}
+	if n != 1 {
+		t.Fatalf("lines = %d, want 1", n)
 	}
 }

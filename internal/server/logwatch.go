@@ -21,6 +21,14 @@ import (
 // maxWatched bounds the containers followed for log alerts.
 const maxWatched = 100
 
+// alertLineLimit: alerts look at long lines further than the display,
+// within bounds: with the 8-line buffer, about 1 MiB per watched container.
+const alertLineLimit = 128 << 10
+
+// restartDelay: a stream that ended is not started again sooner, so a
+// failing container or API is not retried in a loop.
+const restartDelay = 30 * time.Second
+
 // matcher is a compiled log alert.
 type matcher struct {
 	id    int64
@@ -64,6 +72,7 @@ func (s *Server) logWatch(ctx context.Context) {
 	// the pointer tells an old stream from its replacement.
 	type stream struct{ cancel context.CancelFunc }
 	watched := map[string]*stream{}
+	endedAt := map[string]time.Time{} // when a stream last ended
 	ended := make(chan [2]any, 16)
 	defer func() {
 		for _, w := range watched {
@@ -116,7 +125,7 @@ func (s *Server) logWatch(ctx context.Context) {
 			}
 		}
 		for _, c := range all {
-			if !want[c.ID] || watched[c.ID] != nil {
+			if !want[c.ID] || watched[c.ID] != nil || time.Since(endedAt[c.ID]) < restartDelay {
 				continue
 			}
 			cctx, cancel := context.WithCancel(ctx)
@@ -145,6 +154,12 @@ func (s *Server) logWatch(ctx context.Context) {
 			if id := e[0].(string); watched[id] == e[1].(*stream) {
 				watched[id].cancel()
 				delete(watched, id)
+				endedAt[id] = time.Now()
+			}
+			for id, t := range endedAt {
+				if time.Since(t) > restartDelay {
+					delete(endedAt, id)
+				}
 			}
 		}
 	}
@@ -153,14 +168,14 @@ func (s *Server) logWatch(ctx context.Context) {
 // watchOne follows one container's new lines with the rules it was
 // started with; logWatch restarts it when they change.
 func (s *Server) watchOne(ctx context.Context, id, name, stack string, rules []matcher) {
-	lines := make(chan docker.LogLine, 64)
+	lines := make(chan docker.LogLine, 8)
 	go func() {
 		defer close(lines)
 		opts := client.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Follow: true, Tail: "0",
 			Since: fmt.Sprint(time.Now().Unix())}
 		if in, err := s.docker.API.ContainerInspect(ctx, id, client.ContainerInspectOptions{}); err == nil {
 			tty := in.Container.Config != nil && in.Container.Config.Tty
-			if err := docker.StreamLogs(ctx, s.docker.API, id, 0, tty, opts, lines); err != nil && ctx.Err() == nil {
+			if err := docker.StreamLogs(ctx, s.docker.API, id, 0, tty, alertLineLimit, opts, lines); err != nil && ctx.Err() == nil {
 				slog.Warn("log alerts: stream", "container", name, "err", err)
 			}
 		}
