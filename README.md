@@ -71,6 +71,12 @@ another container's network**, like apps routed through a VPN container.
   same event is sent at most once every 10 minutes; Settings sends a test.
 - **Log alerts**: a text (any case) or a `/regexp/`, for one stack or all;
   a matching line in a running container's logs sends a notification.
+- **Automatic updates**, opt-in: a stack's switch (Services tab) or the
+  `dockerr.autoupdate: "true"` service label. Every day at `DOCKERR_AUTOUPDATE_AT`
+  dockerr checks the images, then updates the opted-in stacks (or labelled
+  services) whose image has a newer digest, repairs shared networks, and sends
+  one summary. Tag upgrades (1.27 to 1.28) are never applied on their own;
+  dockerr's own stack is left alone.
 - **Logs**, live, for a container or a whole stack merged in time order:
   colours, search with highlights, last lines or a time window, errors only,
   pause, download, stopped containers too. `DOCKERR_DOZZLE_URL` still adds a
@@ -181,6 +187,7 @@ Each stack is a folder under `DOCKERR_STACKS_DIR` holding `compose.yaml`,
 | `DOCKERR_PORT_HOST` | request host | host used in links to published ports |
 | `DOCKERR_EXEC` | `false` | container terminal (also needs `EXEC=1` on the proxy) |
 | `DOCKERR_UPDATE_INTERVAL` | `6h` | image update checks |
+| `DOCKERR_AUTOUPDATE_AT` | `04:00` | daily time (HH:MM, container local time) of automatic updates |
 | `DOCKERR_REPAIR_NETDEPS` | `true` | repair lost network namespaces after operations |
 | `DOCKERR_NTFY_URL` | — | ntfy topic for notifications, e.g. `https://ntfy.sh/my-topic` |
 | `DOCKERR_NTFY_TOKEN` / `DOCKERR_NTFY_TOKEN_FILE` | — | ntfy access token, or a file holding it |

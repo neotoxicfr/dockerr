@@ -259,6 +259,15 @@ document.addEventListener("click", async (e) => {
     setTimeout(() => chk.classList.remove("busy"), 3000);
     return;
   }
+  const au = e.target.closest("[data-autoupdate]");
+  if (au) {
+    const r = await post(`/s/${encodeURIComponent(au.dataset.autoupdate)}/autoupdate`, { on: au.checked ? "1" : "0" });
+    if (!r.ok) {
+      au.checked = !au.checked;
+      return toast(r.body.error || "Échec", true);
+    }
+    return toast(au.checked ? "Mise à jour automatique activée" : "Mise à jour automatique désactivée");
+  }
   const ad = e.target.closest("[data-alert-delete]");
   if (ad) {
     const r = await post(`/settings/alerts/${ad.dataset.alertDelete}/delete`);

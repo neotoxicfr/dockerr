@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -145,6 +146,10 @@ type stackData struct {
 	Version   *versionView
 	// EditorMode is the compose editor's last mode for this user: visual or text.
 	EditorMode string
+	// AutoUpdate is the stack's opt-in; AutoLabel is set when a service
+	// opts in with the dockerr.autoupdate label.
+	AutoUpdate, AutoLabel bool
+	AutoAt                string
 }
 
 func (s *Server) loadStack(w http.ResponseWriter, r *http.Request) (*stacks.Stack, []*stacks.Container, bool) {
@@ -172,6 +177,11 @@ func (s *Server) stackData(r *http.Request, st *stacks.Stack, all []*stacks.Cont
 		snap := op.Snapshot()
 		d.Op = &snap
 	}
+	if names, err := s.store.AutoUpdates(r.Context()); err == nil {
+		d.AutoUpdate = slices.Contains(names, st.Name)
+	}
+	d.AutoAt = fmt.Sprintf("%02d:%02d", s.cfg.AutoUpdateHour, s.cfg.AutoUpdateMinute)
+	d.AutoLabel = slices.ContainsFunc(st.Services, labeled)
 	for _, c := range st.Containers() {
 		if ch := netdeps.Children(c, all); len(ch) > 0 {
 			d.Children[c.ID] = ch
@@ -629,6 +639,8 @@ type settingsData struct {
 	Notify                          []string // notification channels in use
 	Alerts                          []store.LogAlert
 	StackNames                      []string
+	AutoAt                          string   // daily time of automatic updates
+	AutoStacks                      []string // stacks opted in, by setting or label
 }
 
 type capView struct {
@@ -649,9 +661,14 @@ func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 	d.RecentOps, _ = s.store.Ops(r.Context(), "", 10)
 	d.Notify = s.notifier.Targets()
 	d.Alerts, _ = s.store.LogAlerts(r.Context())
+	d.AutoAt = fmt.Sprintf("%02d:%02d", s.cfg.AutoUpdateHour, s.cfg.AutoUpdateMinute)
+	opted, _ := s.store.AutoUpdates(r.Context())
 	if _, list, err := s.snapshot(r.Context()); err == nil {
 		for _, st := range list {
 			d.StackNames = append(d.StackNames, st.Name)
+			if !st.Self && (slices.Contains(opted, st.Name) || slices.ContainsFunc(st.Services, labeled)) {
+				d.AutoStacks = append(d.AutoStacks, st.Name)
+			}
 		}
 	}
 	s.render(w, r, "settings", "Réglages", "settings", d)

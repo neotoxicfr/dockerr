@@ -121,6 +121,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /s/{name}", s.stackPage)
 	mux.HandleFunc("GET /s/{name}/services", s.stackServices)
 	mux.HandleFunc("POST /s/{name}/op", s.stackOp)
+	mux.HandleFunc("POST /s/{name}/autoupdate", s.stackAutoUpdate)
 	mux.HandleFunc("GET /s/{name}/logs", s.stackLogs)
 	mux.HandleFunc("GET /c/{id}/logs", s.containerLogs)
 	mux.HandleFunc("GET /logs/stream", s.logStream)
@@ -412,6 +413,7 @@ func (s *Server) Background(ctx context.Context) {
 		}()
 	}
 	go s.updates.Loop(ctx, s.cfg.UpdateInterval, s.imageRefs)
+	go s.autoUpdateLoop(ctx)
 	if s.notifier.Enabled() {
 		go s.logWatch(ctx)
 	}
