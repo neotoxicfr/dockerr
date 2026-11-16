@@ -750,10 +750,12 @@ async function bump() {
   if (!s || s.image !== from || s.locked.includes("image")) {
     return toast(`L'image de ${svc} n'est pas écrite telle quelle dans le compose (variable…) : change-la en texte`, true);
   }
+  if (to === from) return;
   await check([{ op: "set", path: ["services", svc, "image"], value: to }]);
   render();
   updateButtons();
-  if (st.compose.includes(to)) save(true);
+  // Only a real change opens the diff: save never runs without it.
+  if (dirty() && st.compose.includes(to)) save(true);
 }
 
 init();

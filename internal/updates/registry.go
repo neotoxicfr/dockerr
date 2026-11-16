@@ -43,7 +43,21 @@ type token struct {
 }
 
 func newRegistry(creds Credentials) *registry {
-	return &registry{http: &http.Client{Timeout: 20 * time.Second}, creds: creds, tokens: map[string]token{}}
+	c := &http.Client{
+		Timeout: 20 * time.Second,
+		// Credentials go out on redirects to the same host: never to plain
+		// HTTP.
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if req.URL.Scheme != "https" {
+				return fmt.Errorf("redirection non HTTPS refusée vers %s", req.URL.Host)
+			}
+			if len(via) >= 10 {
+				return errors.New("trop de redirections")
+			}
+			return nil
+		},
+	}
+	return &registry{http: c, creds: creds, tokens: map[string]token{}}
 }
 
 // Digest returns the digest the registry serves for ref (e.g. "nginx:1.27").
@@ -162,6 +176,9 @@ func (r *registry) token(ctx context.Context, challenge, host, scope string) (st
 	if t == "" {
 		t = body.AccessToken
 	}
+	if t == "" {
+		return "", fmt.Errorf("%s : jeton vide", host)
+	}
 	ttl := time.Duration(body.ExpiresIn) * time.Second
 	if ttl < time.Minute {
 		ttl = time.Minute
@@ -226,6 +243,7 @@ func (r *registry) Tags(ctx context.Context, ref string) ([]string, error) {
 			return nil, err
 		}
 		if resp.StatusCode == http.StatusUnauthorized && tok == "" {
+			// One token per listing: a second 401 is an error below.
 			resp.Body.Close()
 			if tok, err = r.token(ctx, resp.Header.Get("WWW-Authenticate"), host, scope); err != nil {
 				return nil, err
@@ -242,7 +260,7 @@ func (r *registry) Tags(ctx context.Context, ref string) ([]string, error) {
 			return nil, fmt.Errorf("%s : liste des tags, HTTP %d", host, resp.StatusCode)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("%s : liste des tags illisible", host)
+			return nil, fmt.Errorf("%s : liste des tags illisible : %w", host, err)
 		}
 		tags = append(tags, body.Tags...)
 		next = nextPage(resp.Header.Get("Link"), base)
@@ -266,16 +284,20 @@ func (r *registry) get(ctx context.Context, u, host, tok string) (*http.Response
 	return r.http.Do(req)
 }
 
-// nextPage reads `</v2/…/tags/list?last=x&n=1000>; rel="next"`; a link to
-// another host is not followed.
+// nextPage reads `</v2/…/tags/list?last=x&n=1000>; rel="next"`, relative
+// or absolute; a link to another host or scheme is not followed.
 func nextPage(link, base string) string {
 	l, rel, ok := strings.Cut(link, ";")
 	if !ok || !strings.Contains(rel, `rel="next"`) {
 		return ""
 	}
-	l = strings.Trim(strings.TrimSpace(l), "<>")
-	if !strings.HasPrefix(l, "/v2/") {
+	b, err := url.Parse(base)
+	if err != nil {
 		return ""
 	}
-	return base + l
+	u, err := b.Parse(strings.Trim(strings.TrimSpace(l), "<>"))
+	if err != nil || u.Scheme != b.Scheme || u.Host != b.Host || !strings.HasPrefix(u.Path, "/v2/") {
+		return ""
+	}
+	return u.String()
 }
