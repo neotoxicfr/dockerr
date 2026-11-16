@@ -8,7 +8,9 @@ const out = $("#lg-out");
 const status = $("#lg-status");
 const multi = $$(".lg-ctr input").length > 1;
 let lines = []; // {c, t, e, m}
-let es = null, paused = false, pending = [], query = "", errOnly = false;
+// frozen: the lines shown when paused; filters apply to it, not to what
+// keeps coming.
+let es = null, frozen = null, query = "", errOnly = false, retry = null;
 let names = [];
 
 // ---- ANSI colours (SGR) → classes; other escapes dropped
@@ -85,13 +87,12 @@ function append(batch) {
   const frag = document.createDocumentFragment();
   for (const l of batch) if (visible(l)) frag.append(lineEl(l));
   out.append(frag);
-  while (out.childElementCount > MAX) out.firstElementChild.remove();
   if (stick) out.scrollTop = out.scrollHeight;
 }
 
 function redraw() {
   out.replaceChildren();
-  append(lines);
+  append(frozen || lines);
   out.scrollTop = out.scrollHeight;
   count();
 }
@@ -99,7 +100,7 @@ function redraw() {
 function count() {
   const shown = out.childElementCount;
   status.textContent = `${shown} ligne${shown > 1 ? "s" : ""}` + (shown !== lines.length ? ` sur ${lines.length}` : "") +
-    (paused ? " · en pause" : es ? " · en direct" : "");
+    (frozen ? " · en pause" : es ? " · en direct" : "");
 }
 
 function selected() {
@@ -112,8 +113,8 @@ function selected() {
 function connect() {
   if (es) es.close();
   es = null;
+  clearTimeout(retry);
   lines = [];
-  pending = [];
   out.replaceChildren();
   const sel = selected();
   if (!sel.length) { count(); return; }
@@ -133,14 +134,24 @@ function connect() {
     const older = lines.length > 0 && batch.length > 0 && batch[0].t < lines[lines.length - 1].t;
     lines.push(...batch);
     if (older) lines.sort(byTime);
-    if (lines.length > MAX) lines = lines.slice(-MAX);
-    if (older && !paused) redraw();
-    else if (paused) pending.push(...batch);
-    else append(batch);
+    // Trim by steps, and redraw then: the page shows what is kept.
+    const trimmed = lines.length > MAX + 1000;
+    if (trimmed) lines = lines.slice(-MAX);
+    if (!frozen) {
+      if (older || trimmed) redraw();
+      else append(batch);
+    }
     count();
   });
   es.addEventListener("done", () => { es.close(); es = null; count(); });
-  es.onerror = () => { status.textContent = "Connexion perdue, nouvelle tentative…"; };
+  // EventSource would reconnect to the same URL and resend the history on
+  // top of what is shown: start over instead.
+  es.onerror = () => {
+    es.close();
+    es = null;
+    status.textContent = "Connexion perdue, nouvelle tentative…";
+    retry = setTimeout(connect, 3000);
+  };
   count();
 }
 
@@ -153,11 +164,11 @@ $("#lg-err").addEventListener("change", (e) => { errOnly = e.target.checked; red
 $("#lg-since").addEventListener("change", connect);
 $$(".lg-ctr input").forEach((x) => x.addEventListener("change", connect));
 $("#lg-pause").addEventListener("click", (e) => {
-  paused = !paused;
+  frozen = frozen ? null : lines.slice();
   const b = e.currentTarget;
-  $("use", b).setAttribute("href", paused ? "#i-play" : "#i-pause");
-  $("span", b).textContent = paused ? "Reprendre" : "Pause";
-  if (!paused) { append(pending); pending = []; }
+  $("use", b).setAttribute("href", frozen ? "#i-play" : "#i-pause");
+  $("span", b).textContent = frozen ? "Reprendre" : "Pause";
+  if (!frozen) redraw(); // in time order, nothing twice
   count();
 });
 $("#lg-dl").addEventListener("click", () => {
