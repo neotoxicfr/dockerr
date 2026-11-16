@@ -51,7 +51,8 @@ if (pick && input) {
     if (overwrite) q.set("overwrite", "1");
     let r;
     try {
-      r = await fetch(`${base}/upload?${q}`, { method: "POST", body: fd });
+      const host = document.querySelector('meta[name="dockerr-host"]')?.content;
+      r = await fetch(`${base}/upload?${q}`, { method: "POST", body: fd, headers: host ? { "X-Dockerr-Host": host } : {} });
     } catch (e) {
       location.reload();
       return;

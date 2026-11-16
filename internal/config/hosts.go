@@ -1,6 +1,9 @@
 package config
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -41,6 +44,8 @@ func hostEnv(name string) string {
 func parseHosts(getenv func(string) string, local string) ([]Host, error) {
 	var out []Host
 	seen := map[string]bool{local: true}
+	// nas-2 and nas_2 would read the same DOCKERR_*_NAS_2 variables.
+	seenEnv := map[string]string{hostEnv(local): local}
 	for _, item := range strings.FieldsFunc(getenv("DOCKERR_HOSTS"), func(r rune) bool { return r == ',' || r == ' ' }) {
 		name, raw, ok := strings.Cut(item, "=")
 		if !ok || !hostNameRe.MatchString(name) {
@@ -50,6 +55,10 @@ func parseHosts(getenv func(string) string, local string) ([]Host, error) {
 			return nil, fmt.Errorf("DOCKERR_HOSTS : le nom %q est déjà pris", name)
 		}
 		seen[name] = true
+		if other, ok := seenEnv[hostEnv(name)]; ok {
+			return nil, fmt.Errorf("DOCKERR_HOSTS : %q et %q donnent les mêmes variables DOCKERR_*_%s", other, name, hostEnv(name))
+		}
+		seenEnv[hostEnv(name)] = name
 		u, err := url.Parse(raw)
 		if err != nil || u.Scheme != "tcp" || u.Hostname() == "" || u.Port() == "" || u.User != nil ||
 			(u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
@@ -62,10 +71,9 @@ func parseHosts(getenv func(string) string, local string) ([]Host, error) {
 			h.TLSDir = getenv("DOCKER_CERT_PATH")
 		}
 		if h.TLSDir != "" {
-			for _, f := range TLSFiles {
-				if _, err := os.Stat(filepath.Join(h.TLSDir, f)); err != nil {
-					return nil, fmt.Errorf("TLS de l'hôte %s : %w", name, err)
-				}
+			// Read them now: the Docker CLI exits the process on a bad one.
+			if err := checkTLS(h.TLSDir); err != nil {
+				return nil, fmt.Errorf("TLS de l'hôte %s : %w", name, err)
 			}
 		}
 		h.StacksDir = getenv("DOCKERR_STACKS_DIR_" + e)
@@ -78,4 +86,24 @@ func parseHosts(getenv func(string) string, local string) ([]Host, error) {
 		out = append(out, h)
 	}
 	return out, nil
+}
+
+// checkTLS loads ca.pem, cert.pem and key.pem from dir.
+func checkTLS(dir string) error {
+	for _, f := range TLSFiles {
+		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
+			return err
+		}
+	}
+	if _, err := tls.LoadX509KeyPair(filepath.Join(dir, "cert.pem"), filepath.Join(dir, "key.pem")); err != nil {
+		return fmt.Errorf("certificat ou clé illisible : %w", err)
+	}
+	ca, err := os.ReadFile(filepath.Join(dir, "ca.pem"))
+	if err != nil {
+		return err
+	}
+	if !x509.NewCertPool().AppendCertsFromPEM(ca) {
+		return errors.New("ca.pem ne contient aucun certificat")
+	}
+	return nil
 }

@@ -320,6 +320,16 @@ func (m *Manager) LabelFile(labels map[string]string) string {
 	if rel, err := filepath.Rel(m.Dir, f); err != nil || !filepath.IsLocal(rel) {
 		return ""
 	}
+	// The path is checked as written, then as resolved: a symbolic link
+	// inside the folder must not lead out of it.
+	dir, err1 := filepath.EvalSymlinks(m.Dir)
+	real, err2 := filepath.EvalSymlinks(f)
+	if err1 != nil || err2 != nil {
+		return ""
+	}
+	if rel, err := filepath.Rel(dir, real); err != nil || !filepath.IsLocal(rel) {
+		return ""
+	}
 	return f
 }
 

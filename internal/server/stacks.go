@@ -261,13 +261,16 @@ func (s *Server) stackOp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	caps := s.docker.Caps
-	switch kind {
-	case ops.Stop, ops.Restart:
+	// Without a compose file, start only starts the containers there are
+	// (no up): the lifecycle rights are enough, as for stop and restart.
+	startOnly := kind == ops.Start && st.File == ""
+	switch {
+	case kind == ops.Stop || kind == ops.Restart || startOnly:
 		if !caps.Lifecycle {
 			jsonError(w, http.StatusForbidden, "le proxy Docker refuse l'arrêt et le démarrage (ALLOW_START, ALLOW_STOP, ALLOW_RESTARTS)")
 			return
 		}
-	case ops.Repair:
+	case kind == ops.Repair:
 		if !caps.Lifecycle {
 			jsonError(w, http.StatusForbidden, "le proxy Docker refuse les redémarrages")
 			return

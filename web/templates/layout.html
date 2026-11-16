@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="csp-nonce" content="{{.Nonce}}">
+{{if gt (len .Hosts) 1}}<meta name="dockerr-host" content="{{range .Hosts}}{{if .Current}}{{.Name}}{{end}}{{end}}">{{end}}
 <title>{{.Title}} · dockerr</title>
 <meta name="theme-color" content="#f4f5f4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0a0c0f" media="(prefers-color-scheme: dark)">

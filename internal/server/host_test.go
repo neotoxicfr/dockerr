@@ -48,6 +48,7 @@ func TestDispatch(t *testing.T) {
 	s := hostsServer(t)
 	tests := []struct {
 		name, method, path, cookie, accept string
+		header                             string // X-Dockerr-Host
 		code                               int
 		body                               string
 	}{
@@ -60,6 +61,9 @@ func TestDispatch(t *testing.T) {
 		{name: "down host: fragment", path: "/stacks/rows", cookie: "nas", code: 503, body: "connection refused"},
 		{name: "down host: operation", method: "POST", path: "/s/web/op", cookie: "nas", accept: "text/html", code: 503, body: "injoignable"},
 		{name: "down host: settings from local", path: "/settings", cookie: "nas", accept: "text/html", code: 200, body: "local"},
+		{name: "a change goes to the page's host, not the cookie's", method: "POST", path: "/s/web/op", cookie: "local", header: "pi", code: 200, body: "pi"},
+		{name: "unknown page host refused", method: "POST", path: "/s/web/op", cookie: "pi", header: "nope", code: 400, body: "hôte inconnu"},
+		{name: "a read follows the cookie", path: "/s/web", cookie: "local", header: "pi", code: 200, body: "local"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -73,6 +77,9 @@ func TestDispatch(t *testing.T) {
 			}
 			if tt.accept != "" {
 				r.Header.Set("Accept", tt.accept)
+			}
+			if tt.header != "" {
+				r.Header.Set("X-Dockerr-Host", tt.header)
 			}
 			w := httptest.NewRecorder()
 			s.dispatch(w, r)

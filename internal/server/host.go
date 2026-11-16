@@ -155,6 +155,20 @@ func (s *Server) dispatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h := s.hostOf(r)
+	// A change goes to the host of the page it comes from: the cookie is
+	// shared by every tab, and another tab may have switched it since.
+	if name := r.Header.Get("X-Dockerr-Host"); name != "" && r.Method != http.MethodGet && r.Method != http.MethodHead {
+		h = nil
+		for _, x := range s.hosts {
+			if x.Name == name {
+				h = x
+			}
+		}
+		if h == nil {
+			jsonError(w, http.StatusBadRequest, "hôte inconnu : "+name)
+			return
+		}
+	}
 	srv := h.srv.Load()
 	if srv != nil && h.up.Load() {
 		srv.mux.ServeHTTP(w, r)

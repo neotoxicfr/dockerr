@@ -1,17 +1,26 @@
 package config
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseHosts(t *testing.T) {
-	certs := t.TempDir()
+	certs := writeCerts(t)
+	junk := t.TempDir() // the three files, unreadable
 	for _, f := range TLSFiles {
-		if err := os.WriteFile(filepath.Join(certs, f), []byte("x"), 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(junk, f), []byte("x"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -51,6 +60,8 @@ func TestParseHosts(t *testing.T) {
 		{name: "bad name", env: map[string]string{"DOCKERR_HOSTS": "Pi=tcp://pi.example:2375"}, err: "nom=tcp"},
 		{name: "duplicate", env: map[string]string{"DOCKERR_HOSTS": "pi=tcp://a.example:1,pi=tcp://b.example:2"}, err: "déjà pris"},
 		{name: "local name taken", env: map[string]string{"DOCKERR_HOSTS": "local=tcp://a.example:1"}, err: "déjà pris"},
+		{name: "unreadable TLS files", env: map[string]string{"DOCKERR_HOSTS": "pi=tcp://a.example:1", "DOCKERR_TLS_PI_DIR": junk}, err: "illisible"},
+		{name: "same variables", env: map[string]string{"DOCKERR_HOSTS": "nas-2=tcp://a.example:1,nas_2=tcp://b.example:2"}, err: "mêmes variables"},
 		{name: "missing TLS file", env: map[string]string{"DOCKERR_HOSTS": "pi=tcp://a.example:1", "DOCKERR_TLS_PI_DIR": partial}, err: "cert.pem"},
 	}
 	for _, tt := range tests {
@@ -70,4 +81,33 @@ func TestParseHosts(t *testing.T) {
 			}
 		})
 	}
+}
+
+// writeCerts writes a self-signed ca.pem, cert.pem and key.pem.
+func writeCerts(t *testing.T) string {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "test"},
+		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour), IsCA: true, BasicConstraintsValid: true}
+	der, err := x509.CreateCertificate(rand.Reader, tpl, tpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kder, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	cert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	files := map[string][]byte{"ca.pem": cert, "cert.pem": cert,
+		"key.pem": pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: kder})}
+	for name, b := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
 }

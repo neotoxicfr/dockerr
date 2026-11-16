@@ -34,8 +34,12 @@ function confirmAsk(title, text, yes) {
 }
 
 // ---- fetch helpers ----
+// The host this page shows: changes go there, whatever another tab chose.
+const pageHost = document.querySelector('meta[name="dockerr-host"]')?.content;
+
 async function post(url, data, json = false) {
   const opts = { method: "POST", headers: {} };
+  if (pageHost) opts.headers["X-Dockerr-Host"] = pageHost;
   if (json) {
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(data);
