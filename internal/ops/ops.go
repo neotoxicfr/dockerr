@@ -32,11 +32,14 @@ const (
 	Recreate Kind = "recreate" // up -d --force-recreate
 	Down     Kind = "down"     // down --remove-orphans
 	Repair   Kind = "repair"   // rejoin lost network namespaces
+	Pause    Kind = "pause"    // pause (freeze the processes)
+	Unpause  Kind = "unpause"  // unpause
 )
 
 var Labels = map[Kind]string{
 	Start: "Démarrage", Stop: "Arrêt", Restart: "Redémarrage", Update: "Mise à jour",
 	Pull: "Téléchargement", Recreate: "Recréation", Down: "Suppression", Repair: "Réparation réseau",
+	Pause: "Pause", Unpause: "Reprise",
 }
 
 // Valid kinds a client may request.
@@ -260,6 +263,10 @@ func (r *Runner) exec(ctx context.Context, op *Op, st *stacks.Stack) error {
 		return svc.Pull(ctx, p, api.PullOptions{IgnoreBuildable: true})
 	}
 	switch op.Kind {
+	case Pause:
+		return svc.Pause(ctx, st.Name, api.PauseOptions{Project: project, Services: services})
+	case Unpause:
+		return svc.UnPause(ctx, st.Name, api.PauseOptions{Project: project, Services: services})
 	case Start:
 		if project == nil {
 			return svc.Start(ctx, st.Name, api.StartOptions{Services: services})

@@ -356,6 +356,10 @@ func (s *Server) containerAction(w http.ResponseWriter, r *http.Request) {
 		_, err = s.docker.API.ContainerStop(ctx, c.ID, client.ContainerStopOptions{})
 	case "restart":
 		_, err = s.docker.API.ContainerRestart(ctx, c.ID, client.ContainerRestartOptions{})
+	case "pause":
+		_, err = s.docker.API.ContainerPause(ctx, c.ID, client.ContainerPauseOptions{})
+	case "unpause":
+		_, err = s.docker.API.ContainerUnpause(ctx, c.ID, client.ContainerUnpauseOptions{})
 	case "remove":
 		_, err = s.docker.API.ContainerRemove(ctx, c.ID, client.ContainerRemoveOptions{Force: true})
 	default:

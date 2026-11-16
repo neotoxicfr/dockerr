@@ -8,6 +8,10 @@
     {{if and $c.Running $c.ExecEnabled}}<a class="btn" href="/c/{{short $c.ID}}/terminal"><svg class="i s"><use href="#i-terminal"/></svg>Terminal</a>{{end}}
     {{if $c.Running}}
     <button class="btn" data-ctr-action="restart" data-id="{{short $c.ID}}"><svg class="i s"><use href="#i-restart"/></svg>Redémarrer</button>
+    <button class="btn" data-ctr-action="pause" data-id="{{short $c.ID}}"><svg class="i s"><use href="#i-pause"/></svg>Pause</button>
+    <button class="btn" data-ctr-action="stop" data-id="{{short $c.ID}}" data-confirm="Arrêter {{$c.Name}} ?"><svg class="i s"><use href="#i-stop"/></svg>Arrêter</button>
+    {{else if $c.Paused}}
+    <button class="btn primary" data-ctr-action="unpause" data-id="{{short $c.ID}}"><svg class="i s"><use href="#i-play"/></svg>Reprendre</button>
     <button class="btn" data-ctr-action="stop" data-id="{{short $c.ID}}" data-confirm="Arrêter {{$c.Name}} ?"><svg class="i s"><use href="#i-stop"/></svg>Arrêter</button>
     {{else}}
     <button class="btn primary" data-ctr-action="start" data-id="{{short $c.ID}}"><svg class="i s"><use href="#i-play"/></svg>Démarrer</button>

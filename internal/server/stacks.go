@@ -107,7 +107,7 @@ func (s *Server) homeData(ctx context.Context) homeData {
 		switch st.State {
 		case stacks.Running:
 			d.Running++
-		case stacks.Partial:
+		case stacks.Partial, stacks.Paused: // both worth a look
 			d.Partial++
 		case stacks.Problem:
 			d.Problem++
@@ -119,7 +119,7 @@ func (s *Server) homeData(ctx context.Context) homeData {
 		}
 	}
 	// Problems first, then the rest by name.
-	rank := map[stacks.State]int{stacks.Problem: 0, stacks.Partial: 1, stacks.Running: 2, stacks.Stopped: 3}
+	rank := map[stacks.State]int{stacks.Problem: 0, stacks.Partial: 1, stacks.Paused: 1, stacks.Running: 2, stacks.Stopped: 3}
 	slices.SortStableFunc(d.Stacks, func(a, b *stacks.Stack) int { return rank[a.State] - rank[b.State] })
 	d.LastCheck, d.Checking = s.updates.LastRun()
 	return d

@@ -125,6 +125,8 @@ func stateLabel(s stacks.State) string {
 		return "Partielle"
 	case stacks.Problem:
 		return "Problème"
+	case stacks.Paused:
+		return "En pause"
 	}
 	return "Arrêtée"
 }

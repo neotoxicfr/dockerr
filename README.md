@@ -35,7 +35,9 @@ another container's network**, like apps routed through a VPN container.
 - **Stacks at a glance**: state, services up, CPU and memory, pending image
   updates. Problems sort first; search with <kbd>/</kbd>.
 - **One-tap operations** on a stack or a single service: start, stop, restart,
-  update (pull + up), recreate, with live progress.
+  pause and resume, update (pull + up), recreate, with live progress.
+- **Several at once**: tick stacks (or containers, in advanced mode) and
+  start, stop, restart or update them together.
 - **Graphical or text editing**, on the same file: forms per service (image,
   ports, volumes, variables, networks, secrets…) or a YAML editor, switched with
   one click. Form edits rewrite only what changed and keep your comments.
