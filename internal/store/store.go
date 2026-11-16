@@ -38,7 +38,12 @@ func Open(ctx context.Context, dir string) (*Store, error) {
 	if _, err := p.Up(ctx); err != nil {
 		return nil, fmt.Errorf("migrations: %w", err)
 	}
-	return &Store{db: db}, nil
+	s := &Store{db: db}
+	// Retention also applies when no operation runs for a while.
+	if err := s.pruneOps(ctx); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (s *Store) Close() error { return s.db.Close() }

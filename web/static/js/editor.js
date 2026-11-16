@@ -88,7 +88,12 @@ async function runCheck(edits) {
   st.checking = false;
   if (!r.ok) { renderCheck(); return toast(r.body.error || "Vérification impossible", true); }
   if (r.body.edit_error) toast(r.body.edit_error, true);
-  const edited = edits && edits.length && !r.body.edit_error;
+  let edited = edits && edits.length && !r.body.edit_error;
+  // Text typed while the edits ran wins: they applied to the older text.
+  if (edited && body.compose !== st.compose) {
+    toast("Le texte a changé pendant la modification : recommence-la", true);
+    edited = false;
+  }
   if (edited) {
     st.compose = r.body.compose;
     if (ed && st.part === "compose") ed.value = st.compose;
@@ -96,6 +101,7 @@ async function runCheck(edits) {
   // A text change made while this check ran: a newer check is scheduled.
   if (!edited && body.compose !== st.compose) return;
   st.model = r.body.model;
+  st.checked = st.compose;
   st.owners = r.body.owners || {};
   st.issues = r.body.issues || [];
   st.warnings = r.body.warnings || [];
@@ -146,9 +152,14 @@ function renderCheck() {
 // applyFix runs a check's one-click correction: compose edits, and the
 // lines it moves into .env.
 function applyFix(fix) {
+  // A fix was computed for the text last checked: not for later changes.
+  if (st.compose !== st.checked) return check();
   if (fix.env_append) {
     st.env = (st.env && !st.env.endsWith("\n") ? st.env + "\n" : st.env) + fix.env_append;
-    if (ed && st.part === "env") ed.value = st.env;
+    if (st.part === "env") {
+      if (st.mode === "text" && ed) ed.value = st.env;
+      else render();
+    }
   }
   check(fix.edits);
 }
