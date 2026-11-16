@@ -136,9 +136,21 @@ function renderCheck() {
   msg.title = msg.textContent;
   more.hidden = !(all.length > 1 || (all.length === 1 && all[0].line));
   more.textContent = list.hidden ? "Détails" : "Masquer";
-  list.replaceChildren(...all.map((x) => h("button", { type: "button", onclick: () => jump(x.line) },
-    icon(x.bad ? "x" : "alert"), h("span", { class: "ln" }, x.line ? `ligne ${x.line}` : "—"), h("span", {}, x.message))));
+  list.replaceChildren(...all.map((x) => h("div", { class: "row" },
+    h("button", { type: "button", onclick: () => jump(x.line) },
+      icon(x.bad ? "x" : "alert"), h("span", { class: "ln" }, x.line ? `ligne ${x.line}` : "—"), h("span", {}, x.message)),
+    x.fix && editable ? h("button", { type: "button", class: "btn ghost sm fix", onclick: () => applyFix(x.fix) }, x.fix.label) : null)));
   if (!all.length) list.hidden = true;
+}
+
+// applyFix runs a check's one-click correction: compose edits, and the
+// lines it moves into .env.
+function applyFix(fix) {
+  if (fix.env_append) {
+    st.env = (st.env && !st.env.endsWith("\n") ? st.env + "\n" : st.env) + fix.env_append;
+    if (ed && st.part === "env") ed.value = st.env;
+  }
+  check(fix.edits);
 }
 
 $("#ed-check-more").addEventListener("click", () => {

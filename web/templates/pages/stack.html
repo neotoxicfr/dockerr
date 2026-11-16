@@ -2,6 +2,7 @@
 <div id="stack-live" data-live="/s/{{$st.Name}}/services?tab={{$d.Tab}}" data-stack="{{$st.Name}}">{{template "stack-live" .}}</div>
 {{if eq $d.Tab "compose"}}{{template "compose-tab" .}}{{end}}
 {{if eq $d.Tab "history"}}{{template "history-tab" .}}{{end}}
+{{if eq $d.Tab "ops"}}{{template "ops-list" dict "Ops" $d.Ops "Stack" false}}{{end}}
 {{end}}
 
 {{define "compose-tab"}}{{$st := .Data.Stack}}

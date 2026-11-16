@@ -138,6 +138,7 @@ type stackData struct {
 	PortHost  string                         // host for published port links
 	Children  map[string][]*stacks.Container // parent container ID → children
 	Versions  []store.Version
+	Ops       []store.Operation
 	Version   *versionView
 	// EditorMode is the compose editor's last mode for this user: visual or text.
 	EditorMode string
@@ -161,7 +162,7 @@ func (s *Server) loadStack(w http.ResponseWriter, r *http.Request) (*stacks.Stac
 
 func (s *Server) stackData(r *http.Request, st *stacks.Stack, all []*stacks.Container) stackData {
 	d := stackData{Stack: st, Tab: r.URL.Query().Get("tab"), DozzleURL: s.cfg.DozzleURL, PortHost: s.portHost(r), Children: map[string][]*stacks.Container{}}
-	if d.Tab != "compose" && d.Tab != "history" {
+	if d.Tab != "compose" && d.Tab != "history" && d.Tab != "ops" {
 		d.Tab = "services"
 	}
 	if op := s.runner.Running(st.Name); op != nil {
@@ -205,8 +206,11 @@ func (s *Server) stackPage(w http.ResponseWriter, r *http.Request) {
 	}
 	d := s.stackData(r, st, all)
 	d.EditorMode = s.editorMode(r)
-	if d.Tab == "history" {
+	switch d.Tab {
+	case "history":
 		d.Versions, _ = s.store.Versions(r.Context(), st.Name)
+	case "ops":
+		d.Ops, _ = s.store.Ops(r.Context(), st.Name, 100)
 	}
 	s.render(w, r, "stack", st.Name, "stacks", d)
 }
@@ -618,7 +622,7 @@ type settingsData struct {
 	ExecEnabled                     bool
 	ExecLog                         []store.ExecEntry
 	StacksDir                       string
-	RecentOps                       []ops.Snapshot
+	RecentOps                       []store.Operation
 }
 
 type capView struct {
@@ -627,7 +631,7 @@ type capView struct {
 }
 
 func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
-	d := settingsData{Host: s.docker.Host, ExecEnabled: s.cfg.ExecEnabled, StacksDir: s.cfg.StacksDir, RecentOps: s.runner.Recent(20)}
+	d := settingsData{Host: s.docker.Host, ExecEnabled: s.cfg.ExecEnabled, StacksDir: s.cfg.StacksDir}
 	if v, err := s.docker.API.ServerVersion(r.Context(), client.ServerVersionOptions{}); err == nil {
 		d.DaemonVersion, d.APIVersion = v.Version, v.APIVersion
 	}
@@ -636,6 +640,7 @@ func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 	}
 	d.LastCheck, d.Checking = s.updates.LastRun()
 	d.ExecLog, _ = s.store.ExecLog(r.Context(), 20)
+	d.RecentOps, _ = s.store.Ops(r.Context(), "", 10)
 	s.render(w, r, "settings", "Réglages", "settings", d)
 }
 
@@ -667,4 +672,13 @@ func (s *Server) portHost(r *http.Request) string {
 		h = h[:i]
 	}
 	return h
+}
+
+func (s *Server) operations(w http.ResponseWriter, r *http.Request) {
+	list, err := s.store.Ops(r.Context(), "", 300)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.render(w, r, "operations", "Opérations", "settings", list)
 }

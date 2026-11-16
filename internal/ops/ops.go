@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -175,20 +174,6 @@ func (r *Runner) Running(stack string) *Op {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.running[stack]
-}
-
-// Recent returns the last operations, newest first.
-func (r *Runner) Recent(n int) []Snapshot {
-	r.mu.Lock()
-	ids := slices.Clone(r.order)
-	r.mu.Unlock()
-	var out []Snapshot
-	for i := len(ids) - 1; i >= 0 && len(out) < n; i-- {
-		if op := r.Get(ids[i]); op != nil {
-			out = append(out, op.Snapshot())
-		}
-	}
-	return out
 }
 
 // Run starts an operation on a stack (service "" = whole stack).

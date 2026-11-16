@@ -1,0 +1,24 @@
+{{define "ops-list"}}
+{{if .Ops}}
+<div class="ops">
+  {{range .Ops}}
+  <details class="card op">
+    <summary>
+      <span class="dot {{if .Err}}bad{{else}}ok{{end}}"></span>
+      {{if $.Stack}}<a href="/s/{{.Stack}}?tab=ops"><strong>{{.Stack}}</strong></a>{{end}}
+      <span>{{opLabel .Kind}}{{if .Service}} <span class="muted">· {{.Service}}</span>{{end}}</span>
+      {{if .Err}}<span class="faint">échec</span>{{end}}
+      <span class="muted who">{{.User}}</span>
+      <span class="num muted">{{datetime .Started}} · {{.Duration}}</span>
+    </summary>
+    {{if .Err}}<p class="error-box">{{.Err}}</p>{{end}}
+    {{if .Tasks}}<ul class="op-tasks">{{range .Tasks}}
+      <li class="{{.Status}}"><span>{{.ID}}</span> <span>{{.Text}}</span>{{if .Details}} <span class="faint">{{.Details}}</span>{{end}}</li>
+    {{end}}</ul>{{else}}<p class="faint">Aucune sortie.</p>{{end}}
+  </details>
+  {{end}}
+</div>
+{{else}}
+<div class="card empty"><p>Aucune opération enregistrée.</p></div>
+{{end}}
+{{end}}

@@ -41,6 +41,7 @@ func (st *Stack) ReadFiles() (composeText, envText string, err error) {
 type Issue struct {
 	Line    int    `json:"line"`
 	Message string `json:"message"`
+	Fix     *Fix   `json:"fix,omitempty"`
 }
 
 var (

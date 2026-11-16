@@ -448,10 +448,12 @@ a.chip:hover { border-color: var(--accent-line); color: var(--text); }
 .check.bad > svg { color: var(--danger); }
 .check.busy > svg { color: var(--accent); animation: spin 0.9s linear infinite; }
 .check-list { margin: -6px 0 12px; padding: 6px 0; border-radius: var(--r-m); border: 1px solid var(--line); background: var(--surface); }
-.check-list button {
-  display: flex; gap: 10px; width: 100%; padding: 6px 14px; border: 0; background: none; text-align: left; cursor: pointer; color: var(--text);
+.check-list .row { display: flex; align-items: center; gap: 8px; padding-right: 10px; }
+.check-list .row:hover { background: var(--surface-2); }
+.check-list .row > button:first-child {
+  display: flex; gap: 10px; flex: 1; min-width: 0; padding: 6px 14px; border: 0; background: none; text-align: left; cursor: pointer; color: var(--text);
 }
-.check-list button:hover { background: var(--surface-2); }
+.check-list .fix { flex: none; }
 .check-list .ln { color: var(--faint); min-width: 4.5em; font-family: var(--mono); font-size: 12px; }
 
 /* Mode graphique */
@@ -512,6 +514,18 @@ a.chip:hover { border-color: var(--accent-line); color: var(--text); }
 .diff-title { margin: 14px 0 6px; font-size: 13px; color: var(--muted); font-family: var(--mono); }
 
 /* ---- Historique ---------------------------------------------------------------------------- */
+/* Opérations */
+.ops { display: grid; gap: 8px; }
+.op { padding: 0; }
+.op > summary { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-weight: 450; }
+.op > summary .who { margin-left: auto; }
+.op > .error-box { margin: 0 16px 12px; }
+.op-tasks { list-style: none; margin: 0; padding: 10px 16px 14px; display: grid; gap: 3px; font-family: var(--mono); font-size: 12.5px; }
+.op-tasks li { display: flex; gap: 8px; flex-wrap: wrap; overflow-wrap: anywhere; }
+.op-tasks li.error { color: var(--danger); }
+.op-tasks li.warning { color: var(--warn); }
+.section .btn { margin-left: 8px; vertical-align: middle; }
+
 .history { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
 .versions { padding: 5px; }
 .versions button {
