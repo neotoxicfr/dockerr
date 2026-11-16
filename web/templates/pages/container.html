@@ -39,7 +39,7 @@
   {{if $c.Children}}<div class="k">Partage son réseau avec</div><div>{{range $i, $x := $c.Children}}{{if $i}}, {{end}}<a href="/c/{{short $x.ID}}">{{$x.Name}}</a>{{end}}</div>{{end}}
 </div></section>
 
-{{if $c.Mounts}}<section class="panel"><h2>Montages</h2><div class="card kv">
+{{if $c.Mounts}}<section class="panel"><h2>Montages</h2><div class="card kv mounts">
   {{range $c.Mounts}}<div class="k mono">{{.K}}</div><div class="muted">{{.V}}</div>{{end}}
 </div></section>{{end}}
 
