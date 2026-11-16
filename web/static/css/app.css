@@ -382,13 +382,24 @@ input[readonly] { color: var(--muted); }
   background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); font: 500 12.5px var(--font);
 }
 a.chip:hover { border-color: var(--accent-line); color: var(--text); }
+/* A tile's blur makes it a stacking context: the one with an open menu
+   must sit above the tiles after it. */
+:is(.card, .list, .table-wrap):has(.menu:not([hidden])) { position: relative; z-index: 30; }
 .svc-act { display: flex; gap: 2px; align-items: center; justify-content: flex-end; }
+/* Actions are always buttons: with their text when the list is wide
+   enough, icons only otherwise. */
+.svcs { container-type: inline-size; }
+.svc-act .btn { padding-inline: 9px; }
+.svc-act .lbl, .bar-actions .lbl { display: none; }
+@container (min-width: 1100px) { .svc-act .lbl { display: inline; } }
+@media (min-width: 1360px) { .bar-actions .lbl { display: inline; } }
 .svc-act .btn { color: var(--muted); }
 .svc-res { color: var(--faint); font-size: var(--fs-s); white-space: nowrap; min-width: 128px; text-align: right; }
 .netline { display: inline-flex; align-items: center; gap: 6px; }
 .netline.bad { color: var(--danger); font-weight: 550; }
 @media (max-width: 860px) {
   .svc { grid-template-columns: 1fr auto; }
+  .svc-act { grid-column: 1 / -1; order: 4; justify-content: flex-start; flex-wrap: wrap; padding-left: 8px; }
   .svc-meta { grid-column: 1 / -1; order: 3; padding-left: 18px; justify-content: flex-start; }
   .svc-meta:empty { display: none; }
   .svc-res { min-width: 0; text-align: left; }
@@ -607,19 +618,23 @@ details[open] > summary { border-bottom: 1px solid var(--line); }
   position: sticky; top: 0; z-index: 3; background: var(--surface-solid); vertical-align: bottom;
   padding: 12px 6px 10px; border-bottom: 1px solid var(--line-strong); min-width: 92px; text-align: center;
 }
-.netmap thead th:first-child { left: 0; z-index: 4; text-align: left; padding-left: 16px; min-width: 220px; }
+.netmap thead th.stk, .netmap thead th.who { z-index: 4; text-align: left; }
+/* Two sticky columns: the stack, then the container. */
+.netmap .stk { left: 0; width: 150px; min-width: 150px; max-width: 150px; padding-left: 16px; }
+.netmap .who { left: 150px; min-width: 220px; max-width: 300px; }
 .bus-h { display: grid; grid-template-rows: auto auto 18px; justify-items: center; gap: 3px; color: var(--text); font-weight: 600; font-size: 12.5px; }
 .bus-h small { color: var(--faint); font-weight: 400; font-size: 11.5px; }
 .bus-h .badge { height: 18px; font-size: 10.5px; }
 .netmap tbody th {
-  position: sticky; left: 0; z-index: 2; background: var(--surface-solid); text-align: left; font-weight: 500; color: var(--text);
-  padding: 7px 14px 7px 16px; border-top: 1px solid var(--line); min-width: 220px; max-width: 300px;
+  position: sticky; z-index: 2; background: var(--surface-solid); text-align: left; font-weight: 500; color: var(--text);
+  padding: 7px 14px 7px 12px; border-top: 1px solid var(--line);
 }
-.netmap tbody tr.grp th {
-  padding: 14px 16px 6px; color: var(--faint); font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em;
-  text-transform: uppercase; border-top: 1px solid var(--line-strong);
+.netmap tbody th.stk {
+  vertical-align: top; padding: 9px 12px 9px 16px; font-weight: 600; font-size: 13px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.netmap tbody tr.grp td { border-top: 1px solid var(--line-strong); }
+.netmap tbody th.stk a:hover { color: var(--accent-text); }
+.netmap tbody tr.first > * { border-top: 1px solid var(--line-strong); }
 .ctr { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .ctr a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ctr a:hover { color: var(--accent-text); }
@@ -641,10 +656,14 @@ details[open] > summary { border-bottom: 1px solid var(--line); }
 .netmap td.bus .ip { display: block; position: relative; margin-top: 3px; font: 10.5px var(--mono); color: var(--faint); background: var(--surface-solid); }
 .netmap.hl td.bus:not(.hl-col) .tap, .netmap.hl tr:not(.hl-row) > td.bus .tap { opacity: 0.3; }
 .netmap td.hl-col::before { background: color-mix(in srgb, var(--accent) 65%, transparent); }
-.netmap tr.hl-row > th { color: var(--accent-text); }
+.netmap tr.hl-row > th.who { color: var(--accent-text); }
 .netmap thead th.hl-col .bus-h { color: var(--accent-text); }
 @media (max-width: 760px) {
-  .netmap thead th:first-child, .netmap tbody th { min-width: 132px; max-width: 160px; padding-left: 12px; padding-right: 8px; }
+  /* Only the container stays in view: the stack scrolls away. */
+  .netmap .stk { width: 88px; min-width: 88px; max-width: 88px; padding-left: 12px; }
+  .netmap tbody th.stk { position: static; }
+  .netmap thead th.stk { left: auto; }
+  .netmap .who { left: 0; min-width: 132px; max-width: 160px; padding-left: 10px; padding-right: 8px; }
   .netmap thead th, .netmap td.bus { min-width: 64px; }
   .netmap td.bus .ip { display: none; }
   .netmap-wrap { max-height: calc(100dvh - 230px - var(--tab-h)); }

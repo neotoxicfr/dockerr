@@ -11,19 +11,13 @@
     <button class="btn" data-op="restart" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-restart"/></svg>Redémarrer</button>
     <button class="btn" data-op="stop" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-stop"/></svg>Arrêter</button>
     {{end}}
-    <div class="menu-wrap">
-      <button class="btn icon" data-menu aria-label="Plus d'actions" aria-haspopup="menu"><svg class="i"><use href="#i-more"/></svg></button>
-      <div class="menu" role="menu" hidden>
-        {{if not $st.Updates}}<button role="menuitem" data-op="update" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-update"/></svg>Mettre à jour</button>{{end}}
-        <button role="menuitem" data-op="recreate" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-recreate"/></svg>Recréer les conteneurs</button>
-        <button role="menuitem" data-op="repair" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-wrench"/></svg>Réparer le réseau</button>
-        {{if $adv}}
-        <button role="menuitem" data-op="pull" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-download"/></svg>Télécharger les images</button>
-        <hr>
-        <button role="menuitem" class="danger" data-op="down" data-stack="{{$st.Name}}"><svg class="i s"><use href="#i-trash"/></svg>Supprimer les conteneurs</button>
-        {{end}}
-      </div>
-    </div>
+    {{if not $st.Updates}}<button class="btn" data-op="update" data-stack="{{$st.Name}}" title="Mettre à jour"><svg class="i s"><use href="#i-update"/></svg><span class="lbl">Mettre à jour</span></button>{{end}}
+    <button class="btn" data-op="recreate" data-stack="{{$st.Name}}" title="Recréer les conteneurs"><svg class="i s"><use href="#i-recreate"/></svg><span class="lbl">Recréer</span></button>
+    <button class="btn" data-op="repair" data-stack="{{$st.Name}}" title="Réparer le réseau"><svg class="i s"><use href="#i-wrench"/></svg><span class="lbl">Réparer</span></button>
+    {{if $adv}}
+    <button class="btn" data-op="pull" data-stack="{{$st.Name}}" title="Télécharger les images"><svg class="i s"><use href="#i-download"/></svg><span class="lbl">Télécharger</span></button>
+    <button class="btn danger" data-op="down" data-stack="{{$st.Name}}" title="Supprimer les conteneurs"><svg class="i s"><use href="#i-trash"/></svg><span class="lbl">Supprimer</span></button>
+    {{end}}
     {{end}}
   </div>
 </header>
@@ -63,28 +57,25 @@
     </div>
   </div>
   <div class="svc-meta">
-    {{if $c}}{{range $c.Ports}}<a class="chip" href="http://{{$d.PortHost}}:{{.Public}}" target="_blank" rel="noopener" title="{{.Public}} → {{.Private}}/{{.Proto}}">{{.Public}}</a>{{end}}
+    {{if $c}}{{range $c.Ports}}<span class="chip" title="{{.Public}} → {{.Private}}/{{.Proto}}">{{.Public}}</span>{{end}}
     {{if $c.Running}}<span class="svc-res">{{cpu $c.CPU}} · {{bytes $c.Mem}}</span>{{end}}{{end}}
   </div>
   <div class="svc-act">
-    {{if and $c $d.DozzleURL}}<a class="btn icon ghost" href="{{$d.DozzleURL}}/container/{{short $c.ID}}" target="_blank" rel="noopener" title="Logs" aria-label="Logs de {{$s.Name}}"><svg class="i"><use href="#i-logs"/></svg></a>{{end}}
-    <div class="menu-wrap">
-      {{if not $st.Self}}<button class="btn icon ghost" data-menu aria-label="Actions sur {{$s.Name}}" aria-haspopup="menu"><svg class="i"><use href="#i-more"/></svg></button>
-      <div class="menu" role="menu" hidden>
-        {{if and $c $c.Running}}
-        <button role="menuitem" data-op="restart" data-stack="{{$st.Name}}" data-service="{{$s.Name}}"><svg class="i s"><use href="#i-restart"/></svg>Redémarrer</button>
-        <button role="menuitem" data-op="stop" data-stack="{{$st.Name}}" data-service="{{$s.Name}}"><svg class="i s"><use href="#i-stop"/></svg>Arrêter</button>
-        {{else}}
-        <button role="menuitem" data-op="start" data-stack="{{$st.Name}}" data-service="{{$s.Name}}"><svg class="i s"><use href="#i-play"/></svg>Démarrer</button>
-        {{end}}
-        <button role="menuitem" data-op="update" data-stack="{{$st.Name}}" data-service="{{$s.Name}}"><svg class="i s"><use href="#i-update"/></svg>Mettre à jour</button>
-        <button role="menuitem" data-op="recreate" data-stack="{{$st.Name}}" data-service="{{$s.Name}}"><svg class="i s"><use href="#i-recreate"/></svg>Recréer</button>
-        {{if and $c .Adv}}<hr>
-        {{if $c.Running}}<a role="menuitem" href="/c/{{short $c.ID}}/terminal"><svg class="i s"><use href="#i-terminal"/></svg>Terminal</a>{{end}}
-        <a role="menuitem" href="/c/{{short $c.ID}}"><svg class="i s"><use href="#i-info"/></svg>Détails</a>
-        {{end}}
-      </div>{{end}}
-    </div>
+    {{if and $c $d.DozzleURL}}<a class="btn ghost" href="{{$d.DozzleURL}}/container/{{short $c.ID}}" target="_blank" rel="noopener" title="Logs" aria-label="Logs de {{$s.Name}}"><svg class="i"><use href="#i-logs"/></svg><span class="lbl">Logs</span></a>{{end}}
+    {{if not $st.Self}}
+    {{if and $c $c.Running}}
+    <button class="btn ghost" data-op="restart" data-stack="{{$st.Name}}" data-service="{{$s.Name}}" title="Redémarrer" aria-label="Redémarrer {{$s.Name}}"><svg class="i"><use href="#i-restart"/></svg><span class="lbl">Redémarrer</span></button>
+    <button class="btn ghost" data-op="stop" data-stack="{{$st.Name}}" data-service="{{$s.Name}}" title="Arrêter" aria-label="Arrêter {{$s.Name}}"><svg class="i"><use href="#i-stop"/></svg><span class="lbl">Arrêter</span></button>
+    {{else}}
+    <button class="btn ghost" data-op="start" data-stack="{{$st.Name}}" data-service="{{$s.Name}}" title="Démarrer" aria-label="Démarrer {{$s.Name}}"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Démarrer</span></button>
+    {{end}}
+    <button class="btn ghost" data-op="update" data-stack="{{$st.Name}}" data-service="{{$s.Name}}" title="Mettre à jour" aria-label="Mettre à jour {{$s.Name}}"><svg class="i"><use href="#i-update"/></svg><span class="lbl">Mettre à jour</span></button>
+    <button class="btn ghost" data-op="recreate" data-stack="{{$st.Name}}" data-service="{{$s.Name}}" title="Recréer" aria-label="Recréer {{$s.Name}}"><svg class="i"><use href="#i-recreate"/></svg><span class="lbl">Recréer</span></button>
+    {{if and $c .Adv}}
+    {{if $c.Running}}<a class="btn ghost" href="/c/{{short $c.ID}}/terminal" title="Terminal" aria-label="Terminal de {{$s.Name}}"><svg class="i"><use href="#i-terminal"/></svg><span class="lbl">Terminal</span></a>{{end}}
+    <a class="btn ghost" href="/c/{{short $c.ID}}" title="Détails" aria-label="Détails de {{$s.Name}}"><svg class="i"><use href="#i-info"/></svg><span class="lbl">Détails</span></a>
+    {{end}}
+    {{end}}
   </div>
 </div>
 {{end}}

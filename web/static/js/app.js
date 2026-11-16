@@ -338,7 +338,7 @@ if (map) {
   };
   map.addEventListener("pointerover", (e) => {
     const cell = e.target.closest("[data-col]");
-    const row = e.target.closest("tbody tr:not(.grp)");
+    const row = e.target.closest("tbody tr");
     clear();
     if (cell && cell.tagName === "TH") {
       map.classList.add("hl");
