@@ -113,8 +113,11 @@ func (s *Server) logStream(w http.ResponseWriter, r *http.Request) {
 				tty = in.Container.Config != nil && in.Container.Config.Tty
 				o.Follow = in.Container.State != nil && in.Container.State.Running && o.Until == ""
 			}
-			if err := docker.StreamLogs(ctx, s.docker.API, c.ID, i, tty, o, lines); err != nil && ctx.Err() == nil {
-				lines <- docker.LogLine{C: i, T: time.Now(), Err: true, M: "dockerr : " + err.Error()}
+			if err := docker.StreamLogs(ctx, s.docker.API, c.ID, i, tty, 0, o, lines); err != nil && ctx.Err() == nil {
+				select { // the client may be gone: never block here
+				case lines <- docker.LogLine{C: i, T: time.Now(), Err: true, M: "dockerr : " + err.Error()}:
+				case <-ctx.Done():
+				}
 			}
 		}()
 	}

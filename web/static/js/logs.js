@@ -118,6 +118,7 @@ function connect() {
   out.replaceChildren();
   const sel = selected();
   if (!sel.length) { count(); return; }
+  if (sel.length > 30) { status.textContent = "30 conteneurs au plus à la fois : décoche-en quelques-uns."; return; }
   const q = new URLSearchParams();
   for (const s of sel) q.append("c", s.id);
   const since = $("#lg-since").value;

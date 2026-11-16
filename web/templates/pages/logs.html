@@ -19,7 +19,7 @@
     <button class="btn" id="lg-dl" type="button"><svg class="i s"><use href="#i-download"/></svg>Télécharger</button>
   </div>
   {{if gt (len $d.Containers) 1}}<div class="logs-ctrs">{{range $i, $c := $d.Containers}}
-    <label class="lg-ctr c{{$i}}"><input type="checkbox" checked data-id="{{$c.ID}}" data-name="{{logName $c}}"><span class="dot {{ctrClass $c}}"></span>{{logName $c}}</label>{{end}}
+    <label class="lg-ctr c{{$i}}"><input type="checkbox" {{if lt $i 30}}checked{{end}} data-id="{{$c.ID}}" data-name="{{logName $c}}"><span class="dot {{ctrClass $c}}"></span>{{logName $c}}</label>{{end}}
   </div>{{else}}{{range $d.Containers}}<input type="hidden" class="lg-one" data-id="{{.ID}}" data-name="{{logName .}}">{{end}}{{end}}
   <div class="logs-out" id="lg-out" role="log" aria-label="Logs" tabindex="0"></div>
   <div class="logs-status" id="lg-status" aria-live="polite"></div>
