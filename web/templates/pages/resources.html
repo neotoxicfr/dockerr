@@ -87,7 +87,8 @@
         {{if not (eq .Name "host" "none")}}<button class="btn sm" data-net-connect="{{.ID}}" data-name="{{.Name}}"><svg class="i s"><use href="#i-link"/></svg>Connecter un conteneur</button>{{end}}
         {{if .Editable}}
         <button class="btn sm" data-net-edit="{{.ID}}" data-name="{{.Name}}" data-driver="{{.Driver}}" data-parent="{{.Parent}}" data-subnet="{{.Subnet4.K}}" data-gateway="{{.Subnet4.V}}" data-ipv6="{{if .IPv6}}1{{end}}" data-subnet6="{{.Subnet6}}" data-internal="{{if .Internal}}1{{end}}"><svg class="i s"><use href="#i-edit"/></svg>Modifier</button>
-        <button class="btn sm danger" data-net-remove="{{.ID}}" data-name="{{.Name}}"><svg class="i s"><use href="#i-trash"/></svg>Supprimer</button>
+        {{end}}
+        {{if .Removable}}<button class="btn sm danger" data-net-remove="{{.ID}}" data-name="{{.Name}}"><svg class="i s"><use href="#i-trash"/></svg>Supprimer</button>
         {{else if .Project}}<span class="faint small">Géré par la pile {{.Project}} : se modifie dans son compose.</span>
         {{else if .Members}}<span class="faint small">Pour le modifier ou le supprimer, déconnecte d'abord ses conteneurs.</span>{{end}}
       </div>

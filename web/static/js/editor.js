@@ -164,7 +164,9 @@ function applyFix(fix) {
     if (fix.env_append) {
       // The key may have been set in .env while the fix waited: keep it.
       const key = fix.env_append.split("=")[0];
-      if (parseEnv(st.env).some((kv) => kv.key === key)) {
+      // KEY=value or KEY: value, as compose reads .env.
+      const set = new RegExp(`^\\s*(export\\s+)?${key.replace(/[.]/g, "\\.")}\\s*[=:]`, "m");
+      if (set.test(st.env)) {
         toast(`${key} est déjà dans .env : correction annulée`, true);
         return runCheck();
       }

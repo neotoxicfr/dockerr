@@ -66,7 +66,12 @@ submitted(dlg, form, async () => {
   };
   const r = await post(editing ? `/networks/${encodeURIComponent(editing)}/recreate` : "/networks", spec, true);
   if (!r.ok) {
-    if (r.body.id) editing = r.body.id; // the old network was put back under a new ID
+    if (r.body.id) {
+      // The old network was put back under a new ID: the page shows the
+      // removed one, so reload it whenever the form closes.
+      editing = r.body.id;
+      dlg.addEventListener("close", () => location.reload(), { once: true });
+    }
     toast(r.body.error || "Échec", true);
     return false;
   }

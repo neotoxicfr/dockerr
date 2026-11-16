@@ -147,8 +147,6 @@ func (s *Server) editable(ctx context.Context, id string) (network.Inspect, erro
 		return n, fmt.Errorf("%s appartient à la pile %s : modifie-le dans son compose", n.Name, n.Labels[api.ProjectLabel])
 	case len(n.Containers) > 0:
 		return n, fmt.Errorf("%s est utilisé par %d conteneur(s) : déconnecte-les d'abord", n.Name, len(n.Containers))
-	case !formDrivers[n.Driver]:
-		return n, fmt.Errorf("le pilote %s ne se modifie pas ici", n.Driver)
 	}
 	return n, nil
 }
@@ -183,6 +181,9 @@ func (s *Server) networkRecreate(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	old, err := s.editable(ctx, r.PathValue("id"))
+	if err == nil && !formDrivers[old.Driver] {
+		err = fmt.Errorf("le pilote %s ne se modifie pas ici", old.Driver)
+	}
 	if err != nil {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
