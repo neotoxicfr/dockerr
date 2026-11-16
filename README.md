@@ -234,6 +234,9 @@ scrape_configs:
       - targets: ["dockerr:8080"]
 ```
 
+The key travels as a bearer token: scrape over a private Docker network, as
+here, or through HTTPS, never over plain HTTP across hosts.
+
 ### Socket proxy rights
 
 dockerr probes the proxy at start and greys out what it cannot do, naming the

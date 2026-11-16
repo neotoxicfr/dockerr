@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/moby/moby/client"
@@ -698,6 +700,37 @@ func (s *Server) operations(w http.ResponseWriter, r *http.Request) {
 // isSelf reports dockerr's own container: in Docker, the host name is
 // the container ID's prefix.
 func isSelf(c *stacks.Container) bool {
+	if id := selfID(); id != "" {
+		return c.ID == id
+	}
 	self, _ := os.Hostname()
 	return len(self) >= 12 && strings.HasPrefix(c.ID, self)
+}
+
+var (
+	selfOnce sync.Once
+	selfIDv  string
+)
+
+// selfID is dockerr's own container ID, read from the mounts Docker gives
+// every container (/etc/hostname and friends come from
+// /var/lib/docker/containers/<id>/): it holds even with a custom host
+// name. "" outside Docker.
+func selfID() string {
+	selfOnce.Do(func() {
+		b, err := os.ReadFile("/proc/self/mountinfo")
+		if err == nil {
+			selfIDv = containerIDFromMountinfo(string(b))
+		}
+	})
+	return selfIDv
+}
+
+var mountIDRe = regexp.MustCompile(`/containers/([0-9a-f]{64})/`)
+
+func containerIDFromMountinfo(s string) string {
+	if m := mountIDRe.FindStringSubmatch(s); m != nil {
+		return m[1]
+	}
+	return ""
 }

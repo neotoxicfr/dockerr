@@ -8,6 +8,7 @@ const bar = $("#bulk");
 const kind = bar.dataset.bulk; // "stacks" or "containers"
 const picked = new Map(); // key → label
 let running = false;
+const touched = new Set(); // keys ticked or unticked while an action runs
 
 const LABELS = { start: "Démarrer", stop: "Arrêter", restart: "Redémarrer", update: "Mettre à jour",
   pause: "Mettre en pause", unpause: "Reprendre", remove: "Supprimer" };
@@ -25,6 +26,7 @@ document.addEventListener("change", (e) => {
   if (!cb) return;
   if (cb.checked) picked.set(cb.dataset.sel, cb.dataset.label || cb.dataset.sel);
   else picked.delete(cb.dataset.sel);
+  if (running) touched.add(cb.dataset.sel);
   sync();
 });
 
@@ -57,7 +59,9 @@ bar.addEventListener("click", async (e) => {
   const done = results.length - failed.length;
   if (done) toast(`${done} ${kind === "stacks" ? "opération(s) lancée(s)" : "action(s) faite(s)"}`);
   if (failed.length) toast(failed.join(" · "), true);
-  for (const k of keys) picked.delete(k);
+  // Untick what was done, unless it was ticked again meanwhile.
+  for (const k of keys) if (!touched.has(k)) picked.delete(k);
+  touched.clear();
   sync();
   if (kind === "containers") setTimeout(() => location.reload(), 800);
 });

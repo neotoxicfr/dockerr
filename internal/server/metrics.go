@@ -149,7 +149,12 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		last, _ := s.updates.LastRun()
-		ops, _ := s.store.OpCounts(r.Context())
+		ops, err := s.store.OpCounts(r.Context())
+		if err != nil {
+			// A partial answer would be cached and read as real figures.
+			jsonError(w, http.StatusInternalServerError, "lecture des opérations impossible")
+			return
+		}
 		metricsCache.body, metricsCache.at = renderMetrics(metricsData{all, list, last, ops}), time.Now()
 	}
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
