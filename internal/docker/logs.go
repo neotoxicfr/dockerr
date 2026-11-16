@@ -76,6 +76,15 @@ func scanLines(ctx context.Context, r io.Reader, idx int, stderr bool, limit int
 		if err != nil {
 			_, _ = io.Copy(io.Discard, r) // the writer side must not stay blocked
 			if errors.Is(err, io.EOF) {
+				// A last line without newline, long enough to come in parts.
+				if len(buf) > 0 {
+					l := parseLine(string(buf), limit)
+					l.C, l.Err = idx, stderr
+					select {
+					case out <- l:
+					case <-ctx.Done():
+					}
+				}
 				return nil
 			}
 			return fmt.Errorf("lecture des logs : %w", err)
