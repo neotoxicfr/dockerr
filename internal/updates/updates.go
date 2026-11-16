@@ -88,6 +88,9 @@ func (c *Checker) CheckWhenIdle(ctx context.Context, refs []string) bool {
 // begin marks a check as running; wait: until the current one ends.
 func (c *Checker) begin(ctx context.Context, wait bool) bool {
 	for {
+		if ctx.Err() != nil {
+			return false // cancelled while waiting: start nothing
+		}
 		c.mu.Lock()
 		if !c.running {
 			c.running = true
