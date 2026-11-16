@@ -749,11 +749,21 @@ func selfID() string {
 	return selfIDv
 }
 
-var mountIDRe = regexp.MustCompile(`/containers/([0-9a-f]{64})/`)
+var mountIDRe = regexp.MustCompile(`/containers/([0-9a-f]{64})/hostname$`)
 
+// containerIDFromMountinfo reads the mount of /etc/hostname only: any
+// other mount (a bind of /srv/containers/<x>/data…) says nothing about
+// who we are. Field 4 is the source within its filesystem, field 5 the
+// mount point.
 func containerIDFromMountinfo(s string) string {
-	if m := mountIDRe.FindStringSubmatch(s); m != nil {
-		return m[1]
+	for _, line := range strings.Split(s, "\n") {
+		f := strings.Fields(line)
+		if len(f) < 5 || f[4] != "/etc/hostname" {
+			continue
+		}
+		if m := mountIDRe.FindStringSubmatch(f[3]); m != nil {
+			return m[1]
+		}
 	}
 	return ""
 }
