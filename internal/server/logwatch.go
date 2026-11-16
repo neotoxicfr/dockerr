@@ -21,8 +21,9 @@ import (
 // maxWatched bounds the containers followed for log alerts.
 const maxWatched = 100
 
-// alertLineLimit: alerts look at long lines further than the display.
-const alertLineLimit = 1 << 20
+// alertLineLimit: alerts look at long lines further than the display,
+// within bounds: with the 8-line buffer, about 1 MiB per watched container.
+const alertLineLimit = 128 << 10
 
 // restartDelay: a stream that ended is not started again sooner, so a
 // failing container or API is not retried in a loop.
@@ -167,7 +168,7 @@ func (s *Server) logWatch(ctx context.Context) {
 // watchOne follows one container's new lines with the rules it was
 // started with; logWatch restarts it when they change.
 func (s *Server) watchOne(ctx context.Context, id, name, stack string, rules []matcher) {
-	lines := make(chan docker.LogLine, 64)
+	lines := make(chan docker.LogLine, 8)
 	go func() {
 		defer close(lines)
 		opts := client.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Follow: true, Tail: "0",
