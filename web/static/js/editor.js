@@ -152,16 +152,25 @@ function renderCheck() {
 // applyFix runs a check's one-click correction: compose edits, and the
 // lines it moves into .env.
 function applyFix(fix) {
-  // A fix was computed for the text last checked: not for later changes.
-  if (st.compose !== st.checked) return check();
-  if (fix.env_append) {
-    st.env = (st.env && !st.env.endsWith("\n") ? st.env + "\n" : st.env) + fix.env_append;
-    if (st.part === "env") {
-      if (st.mode === "text" && ed) ed.value = st.env;
-      else render();
+  // A fix was computed for the text last checked: it applies only if the
+  // text is still that one when its turn in the queue comes.
+  const base = st.checked;
+  clearTimeout(checkTimer);
+  const job = () => {
+    if (st.compose !== base) {
+      toast("Le texte a changé : correction annulée", true);
+      return runCheck();
     }
-  }
-  check(fix.edits);
+    if (fix.env_append) {
+      st.env = (st.env && !st.env.endsWith("\n") ? st.env + "\n" : st.env) + fix.env_append;
+      if (st.part === "env") {
+        if (st.mode === "text" && ed) ed.value = st.env;
+        else render();
+      }
+    }
+    return runCheck(fix.edits);
+  };
+  chain = chain.then(job, job);
 }
 
 $("#ed-check-more").addEventListener("click", () => {
