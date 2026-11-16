@@ -261,10 +261,16 @@ document.addEventListener("click", async (e) => {
   }
   const nt = e.target.closest("[data-notify-test]");
   if (nt) {
+    if (nt.classList.contains("busy")) return;
     nt.classList.add("busy");
-    const r = await post("/notify/test");
-    nt.classList.remove("busy");
-    toast(r.ok ? "Notification envoyée" : r.body.error || "Échec", !r.ok);
+    try {
+      const r = await post("/notify/test");
+      toast(r.ok ? "Notification envoyée" : r.body.error || "Échec", !r.ok);
+    } catch {
+      toast("Échec", true);
+    } finally {
+      nt.classList.remove("busy");
+    }
     return;
   }
   const pr = e.target.closest("[data-prune]");

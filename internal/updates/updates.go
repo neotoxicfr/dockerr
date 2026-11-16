@@ -94,6 +94,10 @@ func (c *Checker) Check(ctx context.Context, refs []string) {
 		g.Go(func() error {
 			r := c.check(gctx, ref)
 			c.mu.Lock()
+			if r.Err != "" {
+				// A failed lookup tells nothing new: keep what was known.
+				r.Available = c.results[ref].Available
+			}
 			if r.Available && !c.results[ref].Available {
 				fresh = append(fresh, r)
 			}
