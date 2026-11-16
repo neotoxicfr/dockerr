@@ -620,6 +620,8 @@ table.inner tr:first-child td { border-top: 1px solid var(--line); }
 .kv > div { padding: 10px 16px; border-top: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
 .kv > div:nth-child(-n+2) { border-top: 0; }
 .kv .k { color: var(--muted); }
+/* Mounts: the paths are the long side. */
+.kv.mounts { grid-template-columns: minmax(0, 1fr) auto; }
 .panel { margin-bottom: 20px; max-width: 980px; }
 .panel > h2 { margin: 0 0 10px; }
 .masked { display: inline-flex; align-items: center; gap: 8px; }
@@ -629,7 +631,7 @@ details > summary { cursor: pointer; padding: 12px 16px; font-weight: 550; list-
 details > summary::-webkit-details-marker { display: none; }
 details[open] > summary { border-bottom: 1px solid var(--line); }
 @media (max-width: 600px) {
-  .kv { grid-template-columns: 1fr; }
+  .kv, .kv.mounts { grid-template-columns: 1fr; }
   .kv .k { padding-bottom: 0; border-top: 1px solid var(--line); }
   .kv > div:not(.k) { border-top: 0; padding-top: 2px; }
 }
@@ -701,6 +703,7 @@ details[open] > summary { border-bottom: 1px solid var(--line); }
 
 /* ---- Réglages ------------------------------------------------------------------------------- */
 .settings { display: grid; gap: 22px; max-width: 780px; }
+p.setting { display: block; } /* text with code: flex would make each piece a column */
 .setting { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-top: 1px solid var(--line); }
 .setting:first-of-type { border-top: 0; }
 .setting .txt { flex: 1; min-width: 0; }
@@ -831,7 +834,10 @@ dialog[open] { animation: rise 0.16s ease-out; }
   .logs { height: calc(100dvh - 190px - var(--tab-h)); }
   .logs-bar .search, .logs-bar .search input { width: 100%; }
   .logs-out .t { display: none; }
-  .logs-out .n { width: 9ch; }
+  /* The name above the message: beside it, the message had a third of the width. */
+  .logs-out .ln { flex-wrap: wrap; gap: 0 12px; }
+  .logs-out .n { width: auto; max-width: 100%; }
+  .logs-out .m { flex-basis: 100%; }
 }
 
 /* ---- Sélection multiple ------------------------------------------------------------------- */
