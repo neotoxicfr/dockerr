@@ -19,8 +19,11 @@ type Result struct {
 	Remote    string
 	Local     []string // RepoDigests of the local image
 	Available bool
-	Checked   time.Time
-	Err       string
+	// Newer is a later tag of the same shape within the major version,
+	// NewerMajor the latest with a higher major (1.27 → 1.29, 2.1).
+	Newer, NewerMajor string
+	Checked           time.Time
+	Err               string
 }
 
 type Checker struct {
@@ -131,6 +134,13 @@ func (c *Checker) checkOne(ctx context.Context, ref string) Result {
 		return r
 	}
 	r.Remote = remote
+	if _, tag, ok := strings.Cut(strings.TrimPrefix(ref, repoPart(ref)), ":"); ok {
+		if _, isVersion := parseVersion(tag); isVersion {
+			if tags, err := c.reg.Tags(ctx, ref); err == nil {
+				r.Newer, r.NewerMajor = newer(tag, tags)
+			}
+		}
+	}
 	r.Available = true
 	for _, d := range r.Local {
 		name, dg, _ := strings.Cut(d, "@")
@@ -154,4 +164,13 @@ func (c *Checker) Loop(ctx context.Context, interval time.Duration, refs func(co
 			t.Reset(interval)
 		}
 	}
+}
+
+// repoPart is ref up to its tag: a registry port (host:5000/app:1) is not
+// the tag.
+func repoPart(ref string) string {
+	if i := strings.LastIndex(ref, "/"); i >= 0 {
+		return ref[:i+1]
+	}
+	return ""
 }

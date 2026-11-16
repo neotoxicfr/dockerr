@@ -326,6 +326,7 @@ input[readonly] { color: var(--muted); }
 .badge.bad { background: var(--danger-soft); color: var(--danger); }
 .badge.warn { background: var(--warn-soft); color: var(--warn); }
 .badge.plain { background: var(--surface-2); color: var(--muted); }
+a.badge:hover { box-shadow: inset 0 0 0 1px var(--accent); color: var(--text); }
 
 /* ---- Panneaux et listes ---------------------------------------------------------------- */
 .card, .list, .table-wrap {

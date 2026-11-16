@@ -57,6 +57,10 @@ another container's network**, like apps routed through a VPN container.
 - **Update checks** straight against the registries with `HEAD` requests: no
   Docker Hub pull quota spent, private registries through the usual
   `config.json`. A pulled image that a container does not run yet counts too.
+- **Newer versions** of pinned images (`postgres:17`, `nginx:1.27-alpine`):
+  the latest tag of the same shape within the major version, and the latest
+  major apart. One click rewrites the tag in the compose file and shows the
+  diff to save and apply; comments are kept.
 - **Operations history**: every start, stop, update… with who, when, how long,
   the result and compose's full output, per stack and for all stacks (kept 90
   days).

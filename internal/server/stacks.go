@@ -61,8 +61,11 @@ func (s *Server) snapshot(ctx context.Context) ([]*stacks.Container, []*stacks.S
 				}
 				st.CPU += c.CPU
 				st.Mem += c.Mem
-				if r, ok := s.updates.Get(c.Image); ok && r.Available {
-					svc.Update = true
+				if r, ok := s.updates.Get(c.Image); ok {
+					svc.Update = svc.Update || r.Available
+					if r.Newer != "" || r.NewerMajor != "" {
+						svc.Ref, svc.Newer, svc.NewerMajor = c.Image, r.Newer, r.NewerMajor
+					}
 				}
 				if id, ok := tagID[normalizeTag(c.Image)]; ok && id != c.ImageID {
 					svc.Update = true
