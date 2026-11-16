@@ -6,6 +6,39 @@ import (
 	"time"
 )
 
+func TestOpCounts(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now()
+	for _, o := range []Operation{
+		{ID: "1", Stack: "a", Kind: "update", Started: now, Ended: now},
+		{ID: "2", Stack: "b", Kind: "update", Started: now, Ended: now},
+		{ID: "3", Stack: "b", Kind: "update", Started: now, Ended: now, Err: "boom"},
+		{ID: "4", Stack: "b", Kind: "stop", Started: now, Ended: now},
+	} {
+		if err := s.SaveOp(ctx, o); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := s.OpCounts(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []OpCount{{"stop", false, 1}, {"update", false, 2}, {"update", true, 1}}
+	if len(got) != len(want) {
+		t.Fatalf("%v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("%d: %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestOps(t *testing.T) {
 	ctx := context.Background()
 	s, err := Open(ctx, t.TempDir())

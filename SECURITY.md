@@ -43,7 +43,8 @@ never be the only thing standing in front of the Docker API.
 - **Terminal off by default**: it needs `DOCKERR_EXEC=1` *and* `EXEC=1` on the
   proxy. Every session is logged (user, container, start, end).
 - **Self-protection**: dockerr refuses to operate the stack it runs in.
-- **Status API**: `GET /api/status` (counts and stack names only) and
+- **Status API**: `GET /api/status` (counts and stack names only),
+  `GET /metrics` (Prometheus metrics: counts, per-container CPU and memory) and
   `POST /api/updates/check` (starts a registry check, rate-limited) are the
   only routes outside the auth proxy. Each needs a key whose SHA-256 is listed
   in `DOCKERR_API_KEYS_FILE` with that route's scope (compared in constant

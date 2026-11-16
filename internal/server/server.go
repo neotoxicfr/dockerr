@@ -108,6 +108,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/status", s.apiStatus)
 	mux.HandleFunc("POST /api/updates/check", s.apiCheck)
+	mux.HandleFunc("GET /metrics", s.metrics)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("ok")) })
 	mux.Handle("GET /static/", http.StripPrefix("/static/", s.staticHandler()))
 	mux.HandleFunc("GET /sw.js", s.serviceWorker)
@@ -167,7 +168,7 @@ func (s *Server) Handler() http.Handler {
 		p := r.URL.Path
 		// /api/status checks its own key instead of the auth proxy's header.
 		return p == "/healthz" || p == "/manifest.webmanifest" || p == "/sw.js" || strings.HasPrefix(p, "/static/") ||
-			(p == "/api/status" && r.Method == http.MethodGet) || (p == "/api/updates/check" && r.Method == http.MethodPost)
+			((p == "/api/status" || p == "/metrics") && r.Method == http.MethodGet) || (p == "/api/updates/check" && r.Method == http.MethodPost)
 	}
 	return securityHeaders(a.Middleware(mux, open))
 }

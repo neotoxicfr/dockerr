@@ -19,7 +19,7 @@ import (
 
 // apiKeyOK accepts "Authorization: Bearer <key>" or "X-Api-Key: <key>" when
 // the key's SHA-256 is listed in the keys file with that scope. A line is
-// "<sha256 hex> [scope=status|check] [comment]"; without scope= it is a
+// "<sha256 hex> [scope=status|check|metrics] [comment]"; without scope= it is a
 // status key. Each key has one scope: the check key cannot read the status
 // and the status key cannot start a check. The file is read on each request,
 // so a key is added or revoked without a restart.

@@ -49,6 +49,31 @@ func (s *Store) pruneOps(ctx context.Context) error {
 	return nil
 }
 
+// OpCount is how many kept operations of a kind ended with the same result.
+type OpCount struct {
+	Kind   string
+	Failed bool
+	N      int
+}
+
+// OpCounts counts the operations still kept, by kind and result.
+func (s *Store) OpCounts(ctx context.Context) ([]OpCount, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT kind, err <> '', COUNT(*) FROM operations GROUP BY kind, err <> '' ORDER BY kind, err <> ''`)
+	if err != nil {
+		return nil, fmt.Errorf("décompte des opérations : %w", err)
+	}
+	defer rows.Close()
+	var out []OpCount
+	for rows.Next() {
+		var c OpCount
+		if err := rows.Scan(&c.Kind, &c.Failed, &c.N); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 // Ops returns the latest operations, newest first; stack "" lists all.
 func (s *Store) Ops(ctx context.Context, stack string, n int) ([]Operation, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id, host, stack, service, kind, user, started_at, ended_at, err, tasks
