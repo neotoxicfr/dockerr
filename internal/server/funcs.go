@@ -14,10 +14,10 @@ import (
 )
 
 var funcs = template.FuncMap{
-	"bytes":      humanBytes,
-	"cpu":        func(f float64) string { return fmt.Sprintf("%.1f %%", f) },
-	"since":      since,
-	"opLabel":    func(k string) string { return ops.Labels[ops.Kind(k)] },
+	"bytes":   humanBytes,
+	"cpu":     func(f float64) string { return fmt.Sprintf("%.1f %%", f) },
+	"since":   since,
+	"opLabel": func(k string) string { return ops.Labels[ops.Kind(k)] },
 	// newTag swaps the tag of an image reference: nginx:1.27, 1.29 → nginx:1.29.
 	"newTag": func(ref, tag string) string {
 		if i := strings.LastIndex(ref, ":"); i > strings.LastIndex(ref, "/") {

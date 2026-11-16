@@ -23,7 +23,7 @@ type Result struct {
 	// NewerMajor the latest with a higher major (1.27 → 1.29, 2.1).
 	Newer, NewerMajor string
 	Checked           time.Time
-	Err       string
+	Err               string
 }
 
 type Checker struct {
