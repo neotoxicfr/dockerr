@@ -281,12 +281,64 @@ function serviceCard(s, m) {
       onclick: async () => {
         if (await confirmAsk(`Supprimer le service ${s.name} ?`, "Il disparaît du fichier ; ses conteneurs restent jusqu'au prochain « Appliquer ».", "Supprimer")) edit("remove", ["services", s.name]);
       } }, icon("trash")) : null);
-  const card = h("section", { class: "card vsvc" }, head, grid);
+  const card = h("section", { class: "card vsvc" }, head, grid, moreSettings(s, locked, path));
   if (s.other.length) {
     card.append(h("p", { class: "vother" }, `En mode texte : ${s.other.join(", ")}. `,
       h("button", { type: "button", onclick: () => setMode("text", true) }, "Ouvrir en texte")));
   }
   return card;
+}
+
+// moreSettings: the less common settings, folded unless one is set.
+function moreSettings(s, locked, path) {
+  const sc = s.scalars || {}, ls = s.lists || {}, lg = s.logging || { options: [] }, hc = s.healthcheck || {};
+  const txt = (key, label, ico, ph, op = "set") =>
+    field(label, ico, text(sc[key], locked(key), (v) => edit(op, path(key), v), ph));
+  const flag = (key, label) => {
+    if (locked(key)) return h("label", { class: "vflag" }, ro(sc[key]), label);
+    const cb = h("input", { type: "checkbox", checked: sc[key] === "true" });
+    cb.addEventListener("change", () => edit("scalar", path(key), cb.checked ? "true" : ""));
+    return h("label", { class: "vflag" }, cb, label);
+  };
+  const list = (key, label, ico, ph) => field(label, ico, listEditor(ls[key] || [], locked(key), (vs) => edit("list", path(key), vs), ph));
+  const hcPath = (k) => ["services", s.name, "healthcheck", k];
+  const hcLocked = locked("healthcheck");
+  const hcText = (k, label, ph, op = "set") =>
+    field(label, "check", text(hc[k], hcLocked, (v) => edit(op, hcPath(k), v), ph));
+  const lgLocked = locked("logging");
+  const set = Object.values(sc).some(Boolean) || Object.values(ls).some((l) => l && l.length) ||
+    lg.driver || (lg.options || []).length || Object.values(hc).some(Boolean);
+  const grid = h("div", { class: "vgrid" },
+    txt("container_name", "Nom du conteneur", "cube", "automatique"),
+    txt("hostname", "Nom d'hôte", "network", "automatique"),
+    txt("user", "Utilisateur", "user", "celui de l'image, ex. 1000:1000"),
+    txt("working_dir", "Dossier de travail", "box", "celui de l'image"),
+    txt("entrypoint", "Point d'entrée", "terminal", "celui de l'image"),
+    txt("mem_limit", "Mémoire max", "sliders", "illimitée, ex. 512m"),
+    txt("cpus", "Processeurs", "sliders", "illimités, ex. 1.5", "scalar"),
+    txt("shm_size", "Mémoire partagée", "sliders", "64m par défaut"),
+    txt("stop_grace_period", "Délai d'arrêt", "stop", "10s par défaut"),
+    field("Options", "lock", h("div", { class: "vflags" },
+      flag("privileged", "Privilégié"), flag("read_only", "Système en lecture seule"), flag("init", "Processus init"))),
+    list("cap_add", "Capacités ajoutées", "key", "NET_ADMIN"),
+    list("cap_drop", "Capacités retirées", "key", "ALL"),
+    list("devices", "Périphériques", "box", "/dev/dri:/dev/dri"),
+    list("extra_hosts", "Hôtes supplémentaires", "network", "nas:192.168.1.10"),
+    list("dns", "Serveurs DNS", "network", "1.1.1.1"),
+    list("tmpfs", "tmpfs", "box", "/tmp"),
+    list("security_opt", "Options de sécurité", "lock", "no-new-privileges:true"),
+    field("Logs : pilote", "logs", lgLocked ? ro(lg.driver) :
+      select(lg.driver, [["", "celui de Docker"], ["json-file", "json-file"], ["local", "local"], ["journald", "journald"], ["syslog", "syslog"], ["none", "aucun"]],
+        (v) => edit("set", ["services", s.name, "logging", "driver"], v))),
+    field("Logs : options", "logs", kvEditor(lg.options || [], lgLocked,
+      (kv) => edit("map", ["services", s.name, "logging", "options"], kv)), true),
+    hcText("test", "Test de santé", "curl -f http://localhost || exit 1"),
+    hcText("interval", "Intervalle", "30s"),
+    hcText("timeout", "Délai max", "30s"),
+    hcText("retries", "Essais", "3", "scalar"),
+    hcText("start_period", "Démarrage", "0s"),
+  );
+  return h("details", { class: "vmore", open: set }, h("summary", {}, "Plus de réglages"), grid);
 }
 
 function newServiceCard() {

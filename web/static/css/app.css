@@ -484,6 +484,12 @@ a.chip:hover { border-color: var(--accent-line); color: var(--text); }
   background: var(--surface-2); border: 1px solid var(--line); font-size: 13px;
 }
 .vchecks input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+.vmore { border-top: 1px solid var(--line); }
+.vmore > summary { padding: 12px 16px; font-weight: 500; font-size: 13px; color: var(--muted); }
+.vmore[open] > summary { border-bottom: 0; padding-bottom: 0; }
+.vflags { display: grid; gap: 8px; padding-top: 2px; }
+.vflag { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+.vflag input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
 .vother { padding: 0 16px 14px; color: var(--faint); font-size: var(--fs-s); }
 .vother button { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .vnew { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 16px; }
