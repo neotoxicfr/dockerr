@@ -52,7 +52,7 @@ func TestRenderMetrics(t *testing.T) {
 		`dockerr_container_cpu_percent{stack="web",service="web",container="web-1"} 1.50`,
 		`dockerr_container_memory_bytes{stack="w",service="s",container="we\"ird"} 2`,
 		"dockerr_updates_available 2\n", "dockerr_update_last_check_timestamp_seconds 1700000000\n", "dockerr_netdeps_lost 1\n",
-		`dockerr_operations_total{kind="update",result="error"} 1`, `dockerr_operations_total{kind="update",result="ok"} 3`,
+		`dockerr_operations_kept{kind="update",result="error"} 1`, `dockerr_operations_kept{kind="update",result="ok"} 3`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)

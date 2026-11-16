@@ -67,14 +67,15 @@ func renderMetrics(d metricsData) string {
 	p.sample("dockerr_info", 1, "version", Version)
 
 	p.family("dockerr_stacks", "gauge", "Stacks by state.")
-	n := map[stacks.State]int{stacks.Running: 0, stacks.Partial: 0, stacks.Stopped: 0, stacks.Problem: 0}
+	states := []stacks.State{stacks.Running, stacks.Partial, stacks.Paused, stacks.Stopped, stacks.Problem}
+	n := map[stacks.State]int{}
 	updates := 0
 	for _, s := range d.list {
 		n[s.State]++
 		updates += s.Updates
 	}
-	for st, c := range n {
-		p.sample("dockerr_stacks", c, "state", string(st))
+	for _, st := range states { // fixed order: stable output
+		p.sample("dockerr_stacks", n[st], "state", string(st))
 	}
 
 	p.family("dockerr_containers", "gauge", "Containers by state.")
@@ -114,13 +115,13 @@ func renderMetrics(d metricsData) string {
 	p.family("dockerr_netdeps_lost", "gauge", "Containers that lost the network namespace they share.")
 	p.sample("dockerr_netdeps_lost", lost)
 
-	p.family("dockerr_operations_total", "gauge", "Operations kept in the database (retention period, 90 days), by kind and result.")
+	p.family("dockerr_operations_kept", "gauge", "Operations kept in the database (90-day retention), by kind and result; not a counter.")
 	for _, o := range d.ops {
 		res := "ok"
 		if o.Failed {
 			res = "error"
 		}
-		p.sample("dockerr_operations_total", o.N, "kind", o.Kind, "result", res)
+		p.sample("dockerr_operations_kept", o.N, "kind", o.Kind, "result", res)
 	}
 	p.flush()
 	return p.b.String()
