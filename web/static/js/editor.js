@@ -162,6 +162,12 @@ function applyFix(fix) {
       return runCheck();
     }
     if (fix.env_append) {
+      // The key may have been set in .env while the fix waited: keep it.
+      const key = fix.env_append.split("=")[0];
+      if (parseEnv(st.env).some((kv) => kv.key === key)) {
+        toast(`${key} est déjà dans .env : correction annulée`, true);
+        return runCheck();
+      }
       st.env = (st.env && !st.env.endsWith("\n") ? st.env + "\n" : st.env) + fix.env_append;
       if (st.part === "env") {
         if (st.mode === "text" && ed) ed.value = st.env;
@@ -315,8 +321,11 @@ function moreSettings(s, locked, path) {
   const txt = (key, label, ico, ph, op = "set") =>
     field(label, ico, text(sc[key], locked(key), (v) => edit(op, path(key), v), ph));
   const flag = (key, label) => {
-    if (locked(key)) return h("label", { class: "vflag" }, ro(sc[key]), label);
-    const cb = h("input", { type: "checkbox", checked: sc[key] === "true" });
+    // YAML writes true as true, True or TRUE; anything else (a variable…)
+    // cannot show as a checkbox.
+    const v = (sc[key] || "").toLowerCase();
+    if (locked(key) || !["", "true", "false"].includes(v)) return h("label", { class: "vflag" }, ro(sc[key]), label);
+    const cb = h("input", { type: "checkbox", checked: v === "true" });
     cb.addEventListener("change", () => edit("scalar", path(key), cb.checked ? "true" : ""));
     return h("label", { class: "vflag" }, cb, label);
   };
@@ -343,7 +352,7 @@ function moreSettings(s, locked, path) {
     list("cap_add", "Capacités ajoutées", "key", "NET_ADMIN"),
     list("cap_drop", "Capacités retirées", "key", "ALL"),
     list("devices", "Périphériques", "box", "/dev/dri:/dev/dri"),
-    list("extra_hosts", "Hôtes supplémentaires", "network", "nas:192.168.1.10"),
+    list("extra_hosts", "Hôtes supplémentaires", "network", "nas:192.0.2.10"),
     list("dns", "Serveurs DNS", "network", "1.1.1.1"),
     list("tmpfs", "tmpfs", "box", "/tmp"),
     list("security_opt", "Options de sécurité", "lock", "no-new-privileges:true"),

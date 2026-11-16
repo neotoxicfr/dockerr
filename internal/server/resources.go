@@ -196,8 +196,9 @@ func (s *Server) networkRows(ctx context.Context, all []*stacks.Container) ([]ne
 			}
 			sort.Slice(row.Members, func(i, j int) bool { return row.Members[i].Name < row.Members[j].Name })
 			row.Parent = in.Network.Options["parent"]
+			// Only what was read in full can be changed.
+			row.Editable = !predefined[n.Name] && row.Project == "" && len(row.Members) == 0 && formDrivers[n.Driver]
 		}
-		row.Editable = !predefined[n.Name] && row.Project == "" && len(row.Members) == 0
 		out = append(out, row)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })

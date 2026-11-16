@@ -14,12 +14,14 @@ const syncFields = () => {
 form.driver.addEventListener("change", syncFields);
 form.ipv6.addEventListener("change", syncFields);
 
+let busy = false; // a request is running: no second form meanwhile
+
 function openForm(d) {
   editing = d ? d.netEdit : null;
   form.reset();
   if (d) {
     form.name.value = d.name;
-    form.driver.value = d.driver === "macvlan" || d.driver === "ipvlan" ? d.driver : "bridge";
+    form.driver.value = d.driver; // only drivers the form offers are editable
     form.parent.value = d.parent || "";
     form.subnet.value = d.subnet || "";
     form.gateway.value = d.gateway || "";
@@ -34,42 +36,63 @@ function openForm(d) {
   dlg.showModal();
 }
 
-dlg.addEventListener("close", async () => {
-  if (dlg.returnValue !== "ok") return;
+// submitted runs a dialog's request on an explicit submit only, keeps the
+// dialog open (and what was typed) when it fails, and blocks other forms
+// while it runs.
+function submitted(dialog, formEl, run) {
+  formEl.addEventListener("submit", async (e) => {
+    if (e.submitter?.value !== "ok") return; // Annuler closes as usual
+    e.preventDefault();
+    if (busy) return;
+    busy = true;
+    e.submitter.classList.add("busy");
+    try {
+      if (await run()) {
+        dialog.close();
+        setTimeout(() => location.reload(), 500);
+      }
+    } finally {
+      busy = false;
+      e.submitter.classList.remove("busy");
+    }
+  });
+}
+
+submitted(dlg, form, async () => {
   const spec = {
     name: form.name.value.trim(), driver: form.driver.value, parent: form.parent.value.trim(),
     subnet: form.subnet.value.trim(), gateway: form.gateway.value.trim(),
     ipv6: form.ipv6.checked, subnet6: form.subnet6.value.trim(), internal: form.internal.checked,
   };
-  const url = editing ? `/networks/${encodeURIComponent(editing)}/recreate` : "/networks";
-  const r = await post(url, spec, true);
+  const r = await post(editing ? `/networks/${encodeURIComponent(editing)}/recreate` : "/networks", spec, true);
   if (!r.ok) {
+    if (r.body.id) editing = r.body.id; // the old network was put back under a new ID
     toast(r.body.error || "Échec", true);
-    return dlg.showModal(); // keep what was typed
+    return false;
   }
   toast(editing ? `${spec.name} recréé` : `${spec.name} créé`);
-  setTimeout(() => location.reload(), 500);
+  return true;
 });
 
 const conn = $("#net-conn");
 const connForm = $("#net-conn-form");
-conn.addEventListener("close", async () => {
-  if (conn.returnValue !== "ok") return;
+submitted(conn, connForm, async () => {
   const r = await post(`/networks/${encodeURIComponent(conn.dataset.id)}/connect`, {
     container: connForm.container.value, ipv4: connForm.ipv4.value.trim(),
-    aliases: connForm.aliases.value.split(",").map((s) => s.trim()).filter(Boolean),
+    aliases: connForm.aliases.value.split(",").map((x) => x.trim()).filter(Boolean),
   }, true);
   if (!r.ok) {
     toast(r.body.error || "Échec", true);
-    return conn.showModal();
+    return false;
   }
   toast(`${connForm.container.value} connecté`);
-  setTimeout(() => location.reload(), 500);
+  return true;
 });
 
 document.addEventListener("click", async (e) => {
   const t = e.target.closest("[data-net-new], [data-net-edit], [data-net-remove], [data-net-connect], [data-net-disconnect]");
   if (!t) return;
+  if (busy) return;
   const d = t.dataset;
   if ("netNew" in d) return openForm(null);
   if (d.netEdit) return openForm(d);
