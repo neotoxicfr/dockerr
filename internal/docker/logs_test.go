@@ -76,3 +76,15 @@ func TestLastLongLineWithoutNewline(t *testing.T) {
 		t.Fatalf("lines = %d, want 1", n)
 	}
 }
+
+func TestSinceArg(t *testing.T) {
+	cases := map[time.Time]string{
+		time.Unix(100, 0):           "100.000000001",
+		time.Unix(100, 999_999_999): "101.000000000",
+	}
+	for in, want := range cases {
+		if got := sinceArg(in); got != want {
+			t.Errorf("sinceArg(%v) = %q, want %q", in, got, want)
+		}
+	}
+}

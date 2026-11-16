@@ -63,7 +63,8 @@ func TestDispatch(t *testing.T) {
 		{name: "down host: settings from local", path: "/settings", cookie: "nas", accept: "text/html", code: 200, body: "local"},
 		{name: "a change goes to the page's host, not the cookie's", method: "POST", path: "/s/web/op", cookie: "local", header: "pi", code: 200, body: "pi"},
 		{name: "unknown page host refused", method: "POST", path: "/s/web/op", cookie: "pi", header: "nope", code: 400, body: "hôte inconnu"},
-		{name: "a read follows the cookie", path: "/s/web", cookie: "local", header: "pi", code: 200, body: "local"},
+		{name: "a refresh follows the page's host", path: "/stacks/rows", cookie: "local", header: "pi", code: 200, body: "pi"},
+		{name: "a navigation follows the cookie", path: "/s/web", cookie: "pi", code: 200, body: "pi"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
