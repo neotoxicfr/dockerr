@@ -120,6 +120,44 @@ document.addEventListener("click", async (e) => {
   follow(r.body.id, stack, op, service);
 });
 
+// ---- action sheet (phones): every action of a stack or service, with its text
+document.addEventListener("click", (e) => {
+  const m = e.target.closest("[data-sheet]");
+  if (!m) return;
+  let dlg = $("#sheet");
+  if (!dlg) {
+    dlg = document.createElement("dialog");
+    dlg.id = "sheet";
+    dlg.addEventListener("click", (ev) => {
+      // a tap outside the list (the backdrop) or on an action closes it
+      if (ev.target === dlg || ev.target.closest(".sheet-list .btn")) dlg.close();
+    });
+    document.body.append(dlg);
+  }
+  const head = document.createElement("div");
+  head.className = "sheet-head";
+  head.textContent = m.dataset.sheet;
+  const list = document.createElement("div");
+  list.className = "sheet-list";
+  for (const b of m.parentElement.children) {
+    if (b === m || !b.matches(".btn")) continue;
+    const c = b.cloneNode(true);
+    c.classList.remove("ghost", "primary");
+    c.removeAttribute("title");
+    // the visible text is the name here, and the sheet's title says what for
+    c.removeAttribute("aria-label");
+    if (!c.querySelector(".lbl")) {
+      // buttons that always show their text: wrap it so the list matches
+      const t = [...c.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim());
+      for (const n of t) { const s = document.createElement("span"); s.className = "lbl"; s.textContent = n.textContent.trim(); n.replaceWith(s); }
+    }
+    list.append(c);
+  }
+  dlg.replaceChildren(head, list);
+  dlg.setAttribute("aria-label", "Actions de " + m.dataset.sheet);
+  dlg.showModal();
+});
+
 let current = null;
 function follow(id, stack, op, service) {
   if (current) current.close();

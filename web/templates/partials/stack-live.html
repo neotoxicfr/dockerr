@@ -23,6 +23,7 @@
     <button class="btn danger" data-op="down" data-stack="{{$st.Name}}" title="Supprimer les conteneurs"><svg class="i s"><use href="#i-trash"/></svg><span class="lbl">Supprimer</span></button>
     {{end}}
     {{end}}
+    <button type="button" class="btn m-more" data-sheet="{{$st.Name}}"><svg class="i s"><use href="#i-more"/></svg>Actions</button>
   </div>
 </header>
 <nav class="tabs">
@@ -91,6 +92,7 @@
     {{if $c.Running}}<a class="btn ghost" href="/c/{{short $c.ID}}/terminal" title="Terminal" aria-label="Terminal de {{$s.Name}}"><svg class="i"><use href="#i-terminal"/></svg><span class="lbl">Terminal</span></a>{{end}}
     <a class="btn ghost" href="/c/{{short $c.ID}}" title="Détails" aria-label="Détails de {{$s.Name}}"><svg class="i"><use href="#i-info"/></svg><span class="lbl">Détails</span></a>
     {{end}}
+    <button type="button" class="btn ghost m-more" data-sheet="{{$s.Name}}" aria-label="Actions de {{$s.Name}}"><svg class="i"><use href="#i-more"/></svg>Actions</button>
     {{end}}
   </div>
 </div>
