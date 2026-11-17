@@ -20,6 +20,7 @@
 </head>
 <body data-adv="{{if .Advanced}}1{{end}}">
 {{template "icons"}}
+<a class="skip" href="#main">Aller au contenu</a>
 <div class="app">
   <nav class="side" aria-label="Navigation">
     <a class="brand" href="/">{{template "logo"}}dockerr</a>
@@ -28,7 +29,7 @@
     <div class="grow"></div>
     <div class="who" title="{{.User}}"><svg class="i s"><use href="#i-user"/></svg><span>{{.User}}</span></div>
   </nav>
-  <main class="main">{{template "content" .}}</main>
+  <main class="main" id="main" tabindex="-1">{{template "content" .}}</main>
   <nav class="tabbar" aria-label="Navigation">{{template "nav-links" .}}{{template "host-pick" .}}</nav>
 </div>
 <div class="activity" id="activity" hidden role="status" aria-live="polite"></div>
