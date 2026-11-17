@@ -67,11 +67,18 @@ func apiKeyOK(r *http.Request, keysFile, scope string) bool {
 // from compose files, environments or secrets.
 type statusJSON struct {
 	Version    string        `json:"version"`
+	Host       string        `json:"host,omitempty"`  // with several hosts: the one counted
+	Hosts      []hostState   `json:"hosts,omitempty"` // with several hosts: all of them
 	Stacks     stackCounts   `json:"stacks"`
 	Containers ctrCounts     `json:"containers"`
 	Updates    updatesStatus `json:"updates"`
 	Problems   []string      `json:"problems"`
 	NetLost    int           `json:"network_lost"`
+}
+
+type hostState struct {
+	Name string `json:"name"`
+	Up   bool   `json:"up"`
 }
 
 type stackCounts struct {
@@ -133,10 +140,33 @@ func buildStatus(all []*stacks.Container, list []*stacks.Stack, last time.Time, 
 	return st
 }
 
+// statusCache holds each host's status for 15 s.
 var statusCache struct {
 	sync.Mutex
-	at  time.Time
-	val statusJSON
+	at  map[string]time.Time
+	val map[string]statusJSON
+}
+
+// apiHost is the host named by ?host=, the local one without it. It writes
+// the error itself: unknown name, or a host down or not connected yet.
+func (s *Server) apiHost(w http.ResponseWriter, r *http.Request) (*dockerHost, *Server, bool) {
+	name := r.URL.Query().Get("host")
+	if name == "" {
+		name = s.hosts[0].Name
+	}
+	for _, h := range s.hosts {
+		if h.Name != name {
+			continue
+		}
+		srv := h.srv.Load()
+		if srv == nil || !h.up.Load() {
+			jsonError(w, http.StatusServiceUnavailable, "hôte "+name+" injoignable")
+			return nil, nil, false
+		}
+		return h, srv, true
+	}
+	jsonError(w, http.StatusBadRequest, "hôte inconnu : "+name)
+	return nil, nil, false
 }
 
 // apiStatus serves a summary for dashboards, read-only, cached 15 s.
@@ -146,18 +176,33 @@ func (s *Server) apiStatus(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusUnauthorized, "clé d'API absente ou invalide")
 		return
 	}
+	h, srv, ok := s.apiHost(w, r)
+	if !ok {
+		return
+	}
 	statusCache.Lock()
 	defer statusCache.Unlock()
-	if time.Since(statusCache.at) > 15*time.Second {
-		all, list, err := s.snapshot(r.Context())
+	if statusCache.at == nil {
+		statusCache.at, statusCache.val = map[string]time.Time{}, map[string]statusJSON{}
+	}
+	if time.Since(statusCache.at[h.Name]) > 15*time.Second {
+		all, list, err := srv.snapshot(r.Context())
 		if err != nil {
 			jsonError(w, http.StatusBadGateway, "Docker injoignable")
 			return
 		}
-		last, checking := s.updates.LastRun()
-		statusCache.val, statusCache.at = buildStatus(all, list, last, checking), time.Now()
+		last, checking := srv.updates.LastRun()
+		statusCache.val[h.Name], statusCache.at[h.Name] = buildStatus(all, list, last, checking), time.Now()
 	}
-	writeJSON(w, http.StatusOK, statusCache.val)
+	st := statusCache.val[h.Name]
+	if len(s.hosts) > 1 {
+		// Up or down is read now, not cached with the counts.
+		st.Host = h.Name
+		for _, x := range s.hosts {
+			st.Hosts = append(st.Hosts, hostState{x.Name, x.srv.Load() != nil && x.up.Load()})
+		}
+	}
+	writeJSON(w, http.StatusOK, st)
 }
 
 // apiCheck starts an image update check: HEAD requests to the registries,
@@ -168,23 +213,77 @@ func (s *Server) apiCheck(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusUnauthorized, "clé d'API absente ou invalide")
 		return
 	}
-	last, running := s.updates.LastRun()
-	switch {
-	case running:
-		writeJSON(w, http.StatusAccepted, map[string]any{"started": false, "reason": "contrôle déjà en cours"})
-		return
-	case !last.IsZero() && time.Since(last) < 5*time.Minute:
-		w.Header().Set("Retry-After", strconv.Itoa(int((5*time.Minute-time.Since(last)).Seconds())+1))
-		writeJSON(w, http.StatusTooManyRequests, map[string]any{"started": false, "reason": "dernier contrôle il y a moins de 5 minutes"})
-		return
+	// ?host= checks that host; without it, every host that is up.
+	var targets []*dockerHost
+	if r.URL.Query().Get("host") != "" {
+		h, _, ok := s.apiHost(w, r)
+		if !ok {
+			return
+		}
+		targets = []*dockerHost{h}
+	} else {
+		for _, h := range s.hosts {
+			if h.srv.Load() != nil && h.up.Load() {
+				targets = append(targets, h)
+			}
+		}
 	}
-	refs := s.imageRefs(r.Context())
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		defer cancel()
-		s.updates.Check(ctx, refs)
-		s.events.Notify()
-	}()
-	slog.Info("update check started by API", "images", len(refs))
-	writeJSON(w, http.StatusAccepted, map[string]any{"started": true, "images": len(refs)})
+	type result struct {
+		Started bool   `json:"started"`
+		Images  int    `json:"images,omitempty"`
+		Reason  string `json:"reason,omitempty"`
+	}
+	res := map[string]*result{}
+	started, images := false, 0
+	var wait time.Duration
+	waiting := 0
+	for _, h := range targets {
+		srv := h.srv.Load()
+		rs := &result{}
+		res[h.Name] = rs
+		last, running := srv.updates.LastRun()
+		switch {
+		case running:
+			rs.Reason = "contrôle déjà en cours"
+			continue
+		case !last.IsZero() && time.Since(last) < 5*time.Minute:
+			rs.Reason = "dernier contrôle il y a moins de 5 minutes"
+			if d := 5*time.Minute - time.Since(last); wait == 0 || d < wait {
+				wait = d
+			}
+			waiting++
+			continue
+		}
+		refs := srv.imageRefs(r.Context())
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			srv.updates.Check(ctx, refs)
+			srv.events.Notify()
+		}()
+		slog.Info("update check started by API", "host", h.Name, "images", len(refs))
+		rs.Started, rs.Images = true, len(refs)
+		started, images = true, images+len(refs)
+	}
+	out := map[string]any{"started": started}
+	if started {
+		out["images"] = images
+	}
+	if len(s.hosts) > 1 {
+		out["hosts"] = res
+	} else if len(targets) == 1 && !started {
+		out["reason"] = res[targets[0].Name].Reason
+	}
+	switch {
+	case started:
+		writeJSON(w, http.StatusAccepted, out)
+	case len(targets) > 0 && waiting == len(targets):
+		// Every host was checked less than 5 minutes ago.
+		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
+		writeJSON(w, http.StatusTooManyRequests, out)
+	case len(targets) == 0:
+		jsonError(w, http.StatusServiceUnavailable, "aucun hôte joignable")
+	default:
+		writeJSON(w, http.StatusAccepted, out) // already running somewhere
+	}
 }

@@ -235,9 +235,15 @@ key=$(openssl rand -hex 32); printf '%s' "$key" | sha256sum | cut -d' ' -f1 >> /
 
 The file is read on each request: removing a line revokes the key.
 
+With several Docker hosts, `?host=<name>` picks the one counted (the local
+host by default) and the answer adds `host` and `hosts` (each host's name and
+whether it is up). An unknown name gets 400, a host that is down 503.
+
 A line ending in `scope=check` holds a key for `POST /api/updates/check`
 instead, which starts an image update check (HEAD requests to the registries,
-no pull, nothing restarted; at most once every 5 minutes, 429 otherwise). Each
+no pull, nothing restarted; at most once every 5 minutes per host, 429 when
+every host was checked less than 5 minutes ago). Without `?host=` it checks
+every host that is up, and with several hosts the answer details each one. Each
 key has one scope: the check key cannot read the status, and the other way
 round.
 
