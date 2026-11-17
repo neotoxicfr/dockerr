@@ -46,7 +46,11 @@ type Issue struct {
 
 var (
 	lineRe = regexp.MustCompile(`line (\d+)|L(\d+)\.C\d+(?:-L(\d+))?`)
-	pathRe = regexp.MustCompile(`\b((?:services|networks|volumes|configs|secrets)(?:\.[A-Za-z0-9_\-]+)+)`)
+	// An image left empty: "services.app.image must be a string" (no value)
+	// or `service "app" has neither an image nor a build context` ("").
+	noImageRe = regexp.MustCompile(`^services\.([A-Za-z0-9_.\-]+)\.image must be a string$`)
+	noBuildRe = regexp.MustCompile(`service "([^"]+)" has neither an image nor a build context`)
+	pathRe    = regexp.MustCompile(`\b((?:services|networks|volumes|configs|secrets)(?:\.[A-Za-z0-9_\-]+)+)`)
 )
 
 // Validate loads compose and env contents the way `docker compose` would,
@@ -82,6 +86,9 @@ func load(ctx context.Context, name, dir, composeText, envText string) (*types.P
 	msg := strings.TrimPrefix(err.Error(), "validating "+file+": ")
 	msg = strings.ReplaceAll(msg, file+": ", "")
 	is := Issue{Message: msg}
+	if m := noBuildRe.FindStringSubmatch(msg); m != nil {
+		return nil, env, []Issue{{Line: lineOf(composeText, []string{"services", m[1]}), Message: "service " + m[1] + " : image manquante"}}
+	}
 	if m := lineRe.FindStringSubmatch(msg); m != nil {
 		for _, g := range []string{m[3], m[2], m[1]} {
 			if g != "" {
@@ -95,6 +102,9 @@ func load(ctx context.Context, name, dir, composeText, envText string) (*types.P
 		}
 	} else if m := pathRe.FindStringSubmatch(msg); m != nil {
 		is.Line = lineOf(composeText, strings.Split(m[1], "."))
+		if n := noImageRe.FindStringSubmatch(msg); n != nil {
+			is.Message = "service " + n[1] + " : image manquante"
+		}
 	}
 	return nil, env, []Issue{is}
 }
