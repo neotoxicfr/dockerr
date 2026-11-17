@@ -142,3 +142,33 @@ func TestHostKeys(t *testing.T) {
 		t.Fatal("plain TCP misreported")
 	}
 }
+
+func TestAPIHost(t *testing.T) {
+	s := hostsServer(t)
+	tests := []struct {
+		query string
+		code  int
+		want  string
+	}{
+		{query: "", code: http.StatusOK, want: "local"},
+		{query: "?host=pi", code: http.StatusOK, want: "pi"},
+		{query: "?host=nas", code: http.StatusServiceUnavailable, want: "injoignable"},
+		{query: "?host=evil", code: http.StatusBadRequest, want: "hôte inconnu"},
+	}
+	for _, tt := range tests {
+		w := httptest.NewRecorder()
+		h, srv, ok := s.apiHost(w, httptest.NewRequest(http.MethodGet, "/api/status"+tt.query, nil))
+		if ok != (tt.code == http.StatusOK) {
+			t.Fatalf("%q: ok %v, response %d %q", tt.query, ok, w.Code, w.Body.String())
+		}
+		if ok {
+			if h.Name != tt.want || srv.cur != h {
+				t.Fatalf("%q: host %s, server bound to %s", tt.query, h.Name, srv.cur.Name)
+			}
+			continue
+		}
+		if w.Code != tt.code || !strings.Contains(w.Body.String(), tt.want) {
+			t.Fatalf("%q: got %d %q", tt.query, w.Code, w.Body.String())
+		}
+	}
+}
