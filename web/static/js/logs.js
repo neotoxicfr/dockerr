@@ -187,7 +187,8 @@ $("#lg-pause").addEventListener("click", (e) => {
   $("span", b).textContent = frozen ? "Reprendre" : "Pause";
   if (!frozen) redraw(); // in time order, nothing twice
   count();
-  say(frozen ? "Logs en pause" : es ? "Logs repris, en direct" : "Logs repris, flux arrêté");
+  say(frozen ? "Logs en pause" : !es ? "Logs repris, flux arrêté" :
+    es.readyState === EventSource.OPEN ? "Logs repris, en direct" : "Logs repris, connexion en cours");
 });
 $("#lg-dl").addEventListener("click", () => {
   const text = lines.filter(visible).map((l) =>
