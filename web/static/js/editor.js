@@ -395,6 +395,8 @@ function field(label, ico, control, wide = false) {
   const single = /^(INPUT|SELECT|TEXTAREA)$/.test(control.tagName);
   if (single && !control.getAttribute("aria-label")) control.setAttribute("aria-label", label);
   const id = "vf" + ++fieldSeq;
+  // Five "Ajouter" in a row: each says what it adds, the visible word first.
+  if (!single) for (const b of control.querySelectorAll("button")) if (b.textContent.trim() === "Ajouter") b.setAttribute("aria-label", "Ajouter : " + label);
   return h("div", { class: "vf" + (wide ? " wide" : ""), ...(single ? {} : { role: "group", "aria-labelledby": id }) },
     h("span", { class: "lbl", id }, icon(ico), label), control);
 }
