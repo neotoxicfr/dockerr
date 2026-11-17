@@ -122,7 +122,7 @@ function renderCheck() {
   let cls, ico, parts;
   if (st.checking) {
     cls = "busy"; ico = "loader"; parts = ["Vérification…"];
-  } else if (st.issues.length && st.compose === NEW_TEMPLATE) {
+  } else if (st.compose === NEW_TEMPLATE && st.issues.length && st.issues.every((i) => i.message.endsWith("image manquante"))) {
     // The untouched starter: what to fill in, not an error yet.
     cls = "hint"; ico = "info"; parts = ["Indique l'image du service app pour commencer."];
   } else if (st.issues.length) {

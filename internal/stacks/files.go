@@ -102,7 +102,8 @@ func load(ctx context.Context, name, dir, composeText, envText string) (*types.P
 		}
 	} else if m := pathRe.FindStringSubmatch(msg); m != nil {
 		is.Line = lineOf(composeText, strings.Split(m[1], "."))
-		if n := noImageRe.FindStringSubmatch(msg); n != nil {
+		// Only an image with no value: "image: 123" is another mistake.
+		if n := noImageRe.FindStringSubmatch(msg); n != nil && isNull(composeText, "services", n[1], "image") {
 			is.Message = "service " + n[1] + " : image manquante"
 		}
 	}
@@ -111,9 +112,22 @@ func load(ctx context.Context, name, dir, composeText, envText string) (*types.P
 
 // lineOf returns the line of the deepest YAML node found along path.
 func lineOf(text string, path []string) int {
+	line, _ := walk(text, path)
+	return line
+}
+
+// isNull reports a key present with no value (or null).
+func isNull(text string, path ...string) bool {
+	_, n := walk(text, path)
+	return n != nil && n.Tag == "!!null"
+}
+
+// walk follows path in the YAML text: the line of the deepest key found,
+// and the node at the end of path, nil if path is not all there.
+func walk(text string, path []string) (int, *yaml.Node) {
 	var doc yaml.Node
 	if yaml.Unmarshal([]byte(text), &doc) != nil || len(doc.Content) == 0 {
-		return 0
+		return 0, nil
 	}
 	n, line := doc.Content[0], 0
 	for _, key := range path {
@@ -133,11 +147,11 @@ func lineOf(text string, path []string) int {
 			}
 		}
 		if next == nil {
-			break
+			return line, nil
 		}
 		n = next
 	}
-	return line
+	return line, n
 }
 
 // WriteFiles replaces the compose and .env files. An empty envText removes
