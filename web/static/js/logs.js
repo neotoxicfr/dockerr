@@ -126,6 +126,7 @@ function connect() {
   if (es) es.close();
   es = null;
   clearTimeout(retry);
+  retry = null; // set only while a reconnection waits
   lines = [];
   // Paused, the frozen view stays as it is, even through a reconnect.
   if (!frozen) out.replaceChildren();
@@ -187,7 +188,7 @@ $("#lg-pause").addEventListener("click", (e) => {
   $("span", b).textContent = frozen ? "Reprendre" : "Pause";
   if (!frozen) redraw(); // in time order, nothing twice
   count();
-  say(frozen ? "Logs en pause" : !es ? "Logs repris, flux arrêté" :
+  say(frozen ? "Logs en pause" : !es ? (retry ? "Logs repris, connexion en cours" : "Logs repris, flux arrêté") :
     es.readyState === EventSource.OPEN ? "Logs repris, en direct" : "Logs repris, connexion en cours");
 });
 $("#lg-dl").addEventListener("click", () => {
