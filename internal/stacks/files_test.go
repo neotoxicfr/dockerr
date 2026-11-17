@@ -38,6 +38,11 @@ func TestValidate(t *testing.T) {
 	if len(p) != 1 || p[0].Message != "service app : image manquante" || p[0].Line != 3 {
 		t.Errorf("empty image: %+v", p)
 	}
+	typed := "services:\n  app:\n    image: 123\n"
+	p = Validate(context.Background(), "demo", dir, typed, "")
+	if len(p) != 1 || strings.Contains(p[0].Message, "image manquante") {
+		t.Errorf("non-string image reported as missing: %+v", p)
+	}
 	quoted := "services:\n  app:\n    image: \"\"\n"
 	p = Validate(context.Background(), "demo", dir, quoted, "")
 	if len(p) != 1 || p[0].Message != "service app : image manquante" || p[0].Line != 2 {
