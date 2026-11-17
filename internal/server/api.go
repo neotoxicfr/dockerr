@@ -180,21 +180,26 @@ func (s *Server) apiStatus(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// The lock covers the maps only: Docker is asked without it, so a slow
+	// host never holds another's status. Two requests may both ask once.
 	statusCache.Lock()
-	defer statusCache.Unlock()
-	if statusCache.at == nil {
-		statusCache.at, statusCache.val = map[string]time.Time{}, map[string]statusJSON{}
-	}
-	if time.Since(statusCache.at[h.Name]) > 15*time.Second {
+	st, fresh := statusCache.val[h.Name], time.Since(statusCache.at[h.Name]) <= 15*time.Second
+	statusCache.Unlock()
+	if !fresh {
 		all, list, err := srv.snapshot(r.Context())
 		if err != nil {
 			jsonError(w, http.StatusBadGateway, "Docker injoignable")
 			return
 		}
 		last, checking := srv.updates.LastRun()
-		statusCache.val[h.Name], statusCache.at[h.Name] = buildStatus(all, list, last, checking), time.Now()
+		st = buildStatus(all, list, last, checking)
+		statusCache.Lock()
+		if statusCache.at == nil {
+			statusCache.at, statusCache.val = map[string]time.Time{}, map[string]statusJSON{}
+		}
+		statusCache.val[h.Name], statusCache.at[h.Name] = st, time.Now()
+		statusCache.Unlock()
 	}
-	st := statusCache.val[h.Name]
 	if len(s.hosts) > 1 {
 		// Up or down is read now, not cached with the counts.
 		st.Host = h.Name
@@ -254,7 +259,13 @@ func (s *Server) apiCheck(w http.ResponseWriter, r *http.Request) {
 			waiting++
 			continue
 		}
-		refs := srv.imageRefs(r.Context())
+		lctx, lcancel := context.WithTimeout(context.Background(), 30*time.Second)
+		refs := srv.imageRefs(lctx)
+		lcancel()
+		if len(refs) == 0 {
+			rs.Reason = "aucune image à contrôler, ou Docker injoignable"
+			continue
+		}
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()

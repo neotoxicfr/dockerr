@@ -10,13 +10,24 @@ try {
   sessionStorage.removeItem(SAID);
   if (m) toast(m.msg, m.bad);
 } catch { /* storage blocked: nothing kept */ }
+// failedErr: a recreate failed after the old network came back under a new
+// ID; closing the form reloads the page with it, unless a retry succeeded.
+let failedErr = null;
 function reloadWith(msg, bad = false) {
-  try { sessionStorage.setItem(SAID, JSON.stringify({ msg, bad })); } catch { toast(msg, bad); }
+  try {
+    sessionStorage.setItem(SAID, JSON.stringify({ msg, bad }));
+  } catch {
+    // Not kept for the next load: show it now, reload once it was read.
+    toast(msg, bad);
+    setTimeout(() => location.reload(), bad ? 4000 : 1500);
+    return;
+  }
   location.reload();
 }
 const $ = (s, r = document) => r.querySelector(s);
 
 const dlg = $("#net-dlg");
+dlg.addEventListener("close", () => { if (failedErr) reloadWith(failedErr, true); });
 const form = $("#net-form");
 let editing = null; // network id being changed, null when creating
 
@@ -62,6 +73,7 @@ function submitted(dialog, formEl, run) {
     try {
       const said = await run();
       if (said) {
+        failedErr = null; // succeeded since: its own message wins
         dialog.close();
         reloadWith(said);
       }
@@ -85,7 +97,7 @@ submitted(dlg, form, async () => {
       // The old network was put back under a new ID: the page shows the
       // removed one, so reload it whenever the form closes, error kept.
       editing = r.body.id;
-      if (dlg.open) dlg.addEventListener("close", () => reloadWith(err, true), { once: true });
+      if (dlg.open) failedErr = err; // shown by the reload when the form closes
       else { // closed while the request ran
         reloadWith(err, true);
         return false;
