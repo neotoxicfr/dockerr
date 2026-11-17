@@ -6,6 +6,8 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const MAX = 10000; // lines kept in memory
 const out = $("#lg-out");
 const status = $("#lg-status");
+// say: what a screen reader announces; the stream itself is not read out.
+const say = (t) => { $("#lg-say").textContent = t; };
 const multi = $$(".lg-ctr input").length > 1;
 let lines = []; // {c, t, e, m}
 // frozen: the lines shown when paused; filters apply to it, not to what
@@ -129,7 +131,7 @@ function connect() {
   if (!frozen) out.replaceChildren();
   const sel = selected();
   if (!sel.length) { count(); return; }
-  if (sel.length > 30) { status.textContent = "30 conteneurs au plus à la fois : décoche-en quelques-uns."; return; }
+  if (sel.length > 30) { status.textContent = "30 conteneurs au plus à la fois : décoche-en quelques-uns."; say(status.textContent); return; }
   const q = new URLSearchParams();
   for (const s of sel) q.append("c", s.id);
   const since = $("#lg-since").value;
@@ -164,6 +166,7 @@ function connect() {
     es.close();
     es = null;
     status.textContent = "Connexion perdue, nouvelle tentative…";
+    say(status.textContent);
     retry = setTimeout(connect, 3000);
   };
   count();
@@ -184,6 +187,7 @@ $("#lg-pause").addEventListener("click", (e) => {
   $("span", b).textContent = frozen ? "Reprendre" : "Pause";
   if (!frozen) redraw(); // in time order, nothing twice
   count();
+  say(frozen ? "Logs en pause" : "Logs en direct");
 });
 $("#lg-dl").addEventListener("click", () => {
   const text = lines.filter(visible).map((l) =>

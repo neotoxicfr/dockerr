@@ -53,7 +53,7 @@
   <div>
     <div class="svc-head">
       {{if $c}}<span class="dot {{ctrClass $c}}"></span>{{else}}<span class="dot"></span>{{end}}
-      <strong>{{$s.Name}}</strong>
+      <h2 class="svc-name">{{$s.Name}}</h2>
       <span class="svc-state {{if $c}}{{if eq (ctrClass $c) "bad"}}bad{{end}}{{end}}">{{if $c}}{{ctrLabel $c}}{{else}}Pas créé{{end}}</span>
     </div>
     <div class="svc-sub">
