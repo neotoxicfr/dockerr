@@ -12,13 +12,13 @@
 
 {{if eq $d.Tab "containers"}}
 <div class="section-bar"><span class="grow"></span><button class="btn" data-prune="containers" data-confirm="Supprimer les conteneurs arrêtés ?">Supprimer les arrêtés</button></div>
-<div class="table-wrap"><table data-filterable>
+<div class="table-wrap"><table class="cards" data-filterable>
   <thead><tr><th class="pick"><span class="sr">Sélection</span></th><th>Nom</th><th>État</th><th>Image</th><th>Pile</th><th class="num">CPU</th><th class="num">Mémoire</th></tr></thead>
   <tbody>{{range $d.Containers}}
   <tr data-text="{{.Name}} {{.Image}} {{.Project}}">
-    <td class="pick">{{if not (isSelf .)}}<input type="checkbox" data-sel="{{short .ID}}" data-label="{{.Name}}" aria-label="Sélectionner {{.Name}}">{{end}}</td>
-    <td><a class="cell-name" href="/c/{{short .ID}}"><span class="dot {{ctrClass .}}"></span>{{.Name}}</a></td>
-    <td class="muted">{{ctrLabel .}}</td>
+    <td class="pick c-top">{{if not (isSelf .)}}<input type="checkbox" data-sel="{{short .ID}}" data-label="{{.Name}}" aria-label="Sélectionner {{.Name}}">{{end}}</td>
+    <td class="c-top c-grow"><a class="cell-name" href="/c/{{short .ID}}"><span class="dot {{ctrClass .}}"></span>{{.Name}}</a></td>
+    <td class="muted c-top">{{ctrLabel .}}</td>
     <td class="mono muted" title="{{.Image}}">{{imageTag .Image}}</td>
     <td>{{if .Project}}<a href="/s/{{.Project}}">{{.Project}}</a>{{else}}<span class="faint">—</span>{{end}}</td>
     <td class="num muted">{{if .Running}}{{cpu .CPU}}{{end}}</td>
@@ -41,16 +41,16 @@
 {{if eq $d.Tab "images"}}
 {{if not $caps.Images}}<div class="error-box">Le proxy Docker refuse l'accès aux images (IMAGES=1).</div>{{else}}
 <div class="section-bar"><span class="grow"></span><button class="btn" data-prune="images" data-confirm="Supprimer toutes les images qu'aucun conteneur n'utilise ?">Supprimer les inutilisées</button></div>
-<div class="table-wrap"><table data-filterable>
+<div class="table-wrap"><table class="cards" data-filterable>
   <thead><tr><th>Image</th><th>ID</th><th class="num">Taille</th><th class="num">Créée</th><th>Utilisée</th><th><span class="sr">Actions</span></th></tr></thead>
   <tbody>{{range $d.Images}}
   <tr data-text="{{join .Tags " "}} {{.ID}}">
-    <td class="mono">{{if .Tags}}{{join .Tags ", "}}{{else}}<span class="faint">sans tag</span>{{end}}</td>
+    <td class="mono c-top c-grow">{{if .Tags}}{{join .Tags ", "}}{{else}}<span class="faint">sans tag</span>{{end}}</td>
     <td class="mono muted">{{short .ID}}</td>
     <td class="num">{{bytes (u64 .Size)}}</td>
     <td class="num muted">{{since .Created}}</td>
     <td>{{if .Used}}{{.Used}} {{plural .Used "conteneur" "conteneurs"}}{{else}}<span class="faint">non</span>{{end}}</td>
-    <td class="num">{{if not .Used}}<button class="btn icon ghost" data-image-remove="{{.ID}}" aria-label="Supprimer"><svg class="i s"><use href="#i-trash"/></svg></button>{{end}}</td>
+    <td class="num c-top">{{if not .Used}}<button class="btn icon ghost" data-image-remove="{{.ID}}" aria-label="Supprimer"><svg class="i s"><use href="#i-trash"/></svg></button>{{end}}</td>
   </tr>{{end}}</tbody>
 </table></div>
 {{end}}{{end}}
@@ -59,17 +59,17 @@
 {{if not $caps.Networks}}<div class="error-box">Le proxy Docker refuse l'accès aux réseaux (NETWORKS=1).</div>{{else}}
 <div class="fitbox">
 <div class="section-bar"><span class="grow"></span><button class="btn" data-net-new><svg class="i s"><use href="#i-plus"/></svg>Nouveau réseau</button><button class="btn" data-prune="networks" data-confirm="Supprimer les réseaux qu'aucun conteneur n'utilise ?">Supprimer les inutilisés</button></div>
-<div class="table-wrap"><table class="nettable" data-filterable>
+<div class="table-wrap"><table class="nettable cards" data-filterable>
   <thead><tr><th class="tg"><span class="sr">Détails</span></th><th>Réseau</th><th>Pilote</th><th>Sous-réseau</th><th>Passerelle</th><th class="num">Conteneurs</th><th>Pile</th></tr></thead>
   {{range $i, $n := $d.Networks}}
   <tbody class="netrow" data-text="{{.Name}} {{.Project}} {{range .Subnets}}{{.K}} {{end}}{{range .Members}}{{.Name}} {{.IPv4}} {{end}}">
   <tr class="sum" data-toggle="nd{{$i}}">
-    <td class="tg"><button type="button" class="btn ghost sm icon" aria-expanded="false" aria-controls="nd{{$i}}" aria-label="Détails de {{.Name}}"><svg class="i s chev"><use href="#i-chev"/></svg></button></td>
-    <td><span class="cell-name">{{.Name}}{{if .Internal}} <span class="badge plain">interne</span>{{end}}</span></td>
+    <td class="tg c-top"><button type="button" class="btn ghost sm icon" aria-expanded="false" aria-controls="nd{{$i}}" aria-label="Détails de {{.Name}}"><svg class="i s chev"><use href="#i-chev"/></svg></button></td>
+    <td class="c-top c-grow"><span class="cell-name">{{.Name}}{{if .Internal}} <span class="badge plain">interne</span>{{end}}</span></td>
     <td class="muted">{{.Driver}}</td>
     <td class="mono">{{with index4 .Subnets}}{{.K}}{{else}}<span class="faint">—</span>{{end}}</td>
-    <td class="mono">{{with index4 .Subnets}}{{if .V}}{{.V}}{{else}}<span class="faint">—</span>{{end}}{{else}}<span class="faint">—</span>{{end}}</td>
-    <td class="num">{{len .Members}}</td>
+    <td class="mono" data-before="passerelle">{{with index4 .Subnets}}{{if .V}}{{.V}}{{else}}<span class="faint">—</span>{{end}}{{else}}<span class="faint">—</span>{{end}}</td>
+    <td class="num" data-after="{{plural (len .Members) "conteneur" "conteneurs"}}">{{len .Members}}</td>
     <td>{{if .Project}}<a href="/s/{{.Project}}">{{.Project}}</a>{{else}}<span class="faint">—</span>{{end}}</td>
   </tr>
   <tr class="det" id="nd{{$i}}" hidden><td colspan="7">
@@ -148,15 +148,15 @@
 {{if not $caps.Volumes}}<div class="error-box">Le proxy Docker refuse l'accès aux volumes (VOLUMES=1).</div>{{else}}
 <div class="fitbox">
 <div class="section-bar"><span class="grow"></span><button class="btn" data-prune="volumes" data-confirm="Supprimer les volumes anonymes inutilisés ? Les volumes nommés sont gardés.">Supprimer les anonymes inutilisés</button></div>
-<div class="table-wrap"><table data-filterable>
+<div class="table-wrap"><table class="cards" data-filterable>
   <thead><tr><th>Volume</th><th>Pile</th><th>Utilisé par</th><th class="num">Créé</th>{{if and $caps.Containers $caps.Write}}<th><span class="sr">Actions</span></th>{{end}}</tr></thead>
   <tbody>{{range $d.Volumes}}
   <tr data-text="{{.Name}} {{.Project}}">
-    <td class="mono" title="{{.Name}}">{{volName .Name}}</td>
+    <td class="mono c-top c-grow" title="{{.Name}}">{{volName .Name}}</td>
     <td>{{if .Project}}<a href="/s/{{.Project}}">{{.Project}}</a>{{else}}<span class="faint">—</span>{{end}}</td>
     <td>{{if .Users}}{{range $i, $c := .Users}}{{if $i}}, {{end}}{{$c.Name}}{{end}}{{else}}<span class="faint">aucun</span>{{end}}</td>
     <td class="num muted">{{.Created}}</td>
-    {{if and $caps.Containers $caps.Write}}<td class="num"><a class="btn sm" href="/volumes/{{.Name}}/files"><svg class="i s"><use href="#i-folder"/></svg>Fichiers</a></td>{{end}}
+    {{if and $caps.Containers $caps.Write}}<td class="num c-top"><a class="btn sm" href="/volumes/{{.Name}}/files"><svg class="i s"><use href="#i-folder"/></svg>Fichiers</a></td>{{end}}
   </tr>{{end}}</tbody>
 </table></div>
 </div>
