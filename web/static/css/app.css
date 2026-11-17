@@ -621,17 +621,17 @@ td.num, th.num { text-align: right; white-space: nowrap; }
   .table-wrap:has(> table.cards) { overflow: visible; }
   table.cards, table.cards > tbody { display: block; }
   table.cards > thead { display: none; }
-  table.cards tr:not(.det) { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 12px; padding: 11px 14px; border-top: 1px solid var(--line); }
+  table.cards > tbody > tr:not(.det) { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 12px; padding: 11px 14px; border-top: 1px solid var(--line); }
   table.cards > tbody:first-of-type > tr:first-child, table.cards > tbody > tr:first-child:not(:only-child) { border-top: 0; }
-  table.cards tr:not(.det)::after { content: ""; flex-basis: 100%; order: 1; }
-  table.cards tr:not(.det) > td { display: block; padding: 0; border: 0; order: 2; font-size: 12.5px; color: var(--muted); text-align: left; }
-  table.cards tr:not(.det) > td.c-top { order: 0; font-size: inherit; color: inherit; }
-  table.cards tr:not(.det) > td.c-grow { flex: 1; min-width: 0; }
-  table.cards tr:not(.det) > td:empty { display: none; }
+  table.cards > tbody > tr:not(.det)::after { content: ""; flex-basis: 100%; order: 1; }
+  table.cards > tbody > tr:not(.det) > td { display: block; padding: 0; border: 0; order: 2; font-size: 12.5px; color: var(--muted); text-align: left; }
+  table.cards > tbody > tr:not(.det) > td.c-top { order: 0; font-size: inherit; color: inherit; }
+  table.cards > tbody > tr:not(.det) > td.c-grow { flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+  table.cards > tbody > tr:not(.det) > td:empty { display: none; }
   /* rows with a checkbox: details start under the name */
-  table.cards tr:has(> td.pick) > td.c-top + td:not(.c-top) { padding-left: 28px; }
+  table.cards > tbody > tr:has(> td.pick) > td.c-top + td:not(.c-top) { padding-left: 28px; }
   /* an empty value ("—", "non", "aucun") says nothing on a card */
-  table.cards tr:not(.det) > td:has(> .faint:only-child) { display: none; }
+  table.cards > tbody > tr:not(.det) > td:not(.c-top):has(> .faint:only-child) { display: none; }
   table.cards td[data-before]::before { content: attr(data-before) " "; color: var(--faint); font-family: var(--font); }
   table.cards td[data-after]::after { content: " " attr(data-after); color: var(--faint); }
 }
