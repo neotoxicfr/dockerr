@@ -1,6 +1,19 @@
 // Network management on the resources page: create, change (remove and
 // create again), connect and disconnect containers, remove.
 const { toast, confirmAsk, post } = window.dockerr;
+
+// Most changes reload the page: their message is kept for the next load,
+// or a failure would vanish with the reload.
+const SAID = "dockerr-net-toast";
+try {
+  const m = JSON.parse(sessionStorage.getItem(SAID) || "null");
+  sessionStorage.removeItem(SAID);
+  if (m) toast(m.msg, m.bad);
+} catch { /* storage blocked: nothing kept */ }
+function reloadWith(msg, bad = false) {
+  try { sessionStorage.setItem(SAID, JSON.stringify({ msg, bad })); } catch { toast(msg, bad); }
+  location.reload();
+}
 const $ = (s, r = document) => r.querySelector(s);
 
 const dlg = $("#net-dlg");
@@ -47,9 +60,10 @@ function submitted(dialog, formEl, run) {
     busy = true;
     e.submitter.classList.add("busy");
     try {
-      if (await run()) {
+      const said = await run();
+      if (said) {
         dialog.close();
-        setTimeout(() => location.reload(), 500);
+        reloadWith(said);
       }
     } finally {
       busy = false;
@@ -66,18 +80,21 @@ submitted(dlg, form, async () => {
   };
   const r = await post(editing ? `/networks/${encodeURIComponent(editing)}/recreate` : "/networks", spec, true);
   if (!r.ok) {
+    const err = r.body.error || "Échec";
     if (r.body.id) {
       // The old network was put back under a new ID: the page shows the
-      // removed one, so reload it whenever the form closes.
+      // removed one, so reload it whenever the form closes, error kept.
       editing = r.body.id;
-      if (dlg.open) dlg.addEventListener("close", () => location.reload(), { once: true });
-      else location.reload(); // closed while the request ran
+      if (dlg.open) dlg.addEventListener("close", () => reloadWith(err, true), { once: true });
+      else { // closed while the request ran
+        reloadWith(err, true);
+        return false;
+      }
     }
-    toast(r.body.error || "Échec", true);
+    toast(err, true);
     return false;
   }
-  toast(editing ? `${spec.name} recréé` : `${spec.name} créé`);
-  return true;
+  return editing ? `${spec.name} recréé` : `${spec.name} créé`;
 });
 
 const conn = $("#net-conn");
@@ -91,8 +108,7 @@ submitted(conn, connForm, async () => {
     toast(r.body.error || "Échec", true);
     return false;
   }
-  toast(`${connForm.container.value} connecté`);
-  return true;
+  return `${connForm.container.value} connecté`;
 });
 
 document.addEventListener("click", async (e) => {
@@ -112,12 +128,12 @@ document.addEventListener("click", async (e) => {
     if (!(await confirmAsk(`Supprimer le réseau ${d.name} ?`, "", "Supprimer"))) return;
     const r = await post(`/networks/${encodeURIComponent(d.netRemove)}/remove`, {}, true);
     if (!r.ok) return toast(r.body.error || "Échec", true);
-    return location.reload();
+    return reloadWith(`${d.name} supprimé`);
   }
   if (d.netDisconnect) {
     if (!(await confirmAsk(`Déconnecter ${d.container} ?`, "Le conteneur perd ce réseau jusqu'à sa prochaine recréation.", "Déconnecter"))) return;
     const r = await post(`/networks/${encodeURIComponent(d.netDisconnect)}/disconnect`, { container: d.container }, true);
     if (!r.ok) return toast(r.body.error || "Échec", true);
-    location.reload();
+    reloadWith(`${d.container} déconnecté`);
   }
 });
