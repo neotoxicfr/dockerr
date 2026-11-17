@@ -385,9 +385,15 @@ function newServiceCard() {
     h("button", { type: "button", class: "btn", onclick: add }, icon("plus"), "Ajouter un service"));
 }
 
+let fieldSeq = 0;
+// field labels its control; a list of inputs becomes a group named by the
+// label, so each row's inputs are read with it, rows added later included.
 function field(label, ico, control, wide = false) {
-  if (/^(INPUT|SELECT|TEXTAREA)$/.test(control.tagName) && !control.getAttribute("aria-label")) control.setAttribute("aria-label", label);
-  return h("div", { class: "vf" + (wide ? " wide" : "") }, h("span", { class: "lbl" }, icon(ico), label), control);
+  const single = /^(INPUT|SELECT|TEXTAREA)$/.test(control.tagName);
+  if (single && !control.getAttribute("aria-label")) control.setAttribute("aria-label", label);
+  const id = "vf" + ++fieldSeq;
+  return h("div", { class: "vf" + (wide ? " wide" : ""), ...(single ? {} : { role: "group", "aria-labelledby": id }) },
+    h("span", { class: "lbl", id }, icon(ico), label), control);
 }
 const ro = (v) => h("div", { class: "ro", title: "À modifier en mode texte" }, icon("lock"), " ", v || "—");
 
