@@ -32,6 +32,17 @@ func TestValidate(t *testing.T) {
 	if strings.Contains(p[0].Message, dir) {
 		t.Errorf("message leaks temp path: %q", p[0].Message)
 	}
+
+	empty := "services:\n  app:\n    image: \n    restart: unless-stopped\n"
+	p = Validate(context.Background(), "demo", dir, empty, "")
+	if len(p) != 1 || p[0].Message != "service app : image manquante" || p[0].Line != 3 {
+		t.Errorf("empty image: %+v", p)
+	}
+	quoted := "services:\n  app:\n    image: \"\"\n"
+	p = Validate(context.Background(), "demo", dir, quoted, "")
+	if len(p) != 1 || p[0].Message != "service app : image manquante" || p[0].Line != 2 {
+		t.Errorf("empty image string: %+v", p)
+	}
 }
 
 func TestLineOf(t *testing.T) {

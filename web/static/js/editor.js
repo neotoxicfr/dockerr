@@ -122,6 +122,9 @@ function renderCheck() {
   let cls, ico, parts;
   if (st.checking) {
     cls = "busy"; ico = "loader"; parts = ["Vérification…"];
+  } else if (st.issues.length && st.compose === NEW_TEMPLATE) {
+    // The untouched starter: what to fill in, not an error yet.
+    cls = "hint"; ico = "info"; parts = ["Indique l'image du service app pour commencer."];
   } else if (st.issues.length) {
     const i = st.issues[0];
     cls = "bad"; ico = "alert";
