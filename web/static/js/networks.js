@@ -13,13 +13,15 @@ try {
 // failedErr: a recreate failed after the old network came back under a new
 // ID; closing the form reloads the page with it, unless a retry succeeded.
 let failedErr = null;
+let reloadTimer = null;
 function reloadWith(msg, bad = false) {
+  clearTimeout(reloadTimer); // one reload, the last message's
   try {
     sessionStorage.setItem(SAID, JSON.stringify({ msg, bad }));
   } catch {
     // Not kept for the next load: show it now, reload once it was read.
     toast(msg, bad);
-    setTimeout(() => location.reload(), bad ? 4000 : 1500);
+    reloadTimer = setTimeout(() => location.reload(), bad ? 4000 : 1500);
     return;
   }
   location.reload();

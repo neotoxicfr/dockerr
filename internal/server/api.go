@@ -186,6 +186,7 @@ func (s *Server) apiStatus(w http.ResponseWriter, r *http.Request) {
 	st, fresh := statusCache.val[h.Name], time.Since(statusCache.at[h.Name]) <= 15*time.Second
 	statusCache.Unlock()
 	if !fresh {
+		asked := time.Now()
 		all, list, err := srv.snapshot(r.Context())
 		if err != nil {
 			jsonError(w, http.StatusBadGateway, "Docker injoignable")
@@ -197,7 +198,10 @@ func (s *Server) apiStatus(w http.ResponseWriter, r *http.Request) {
 		if statusCache.at == nil {
 			statusCache.at, statusCache.val = map[string]time.Time{}, map[string]statusJSON{}
 		}
-		statusCache.val[h.Name], statusCache.at[h.Name] = st, time.Now()
+		// A slower request that asked earlier must not replace a newer answer.
+		if asked.After(statusCache.at[h.Name]) {
+			statusCache.val[h.Name], statusCache.at[h.Name] = st, asked
+		}
 		statusCache.Unlock()
 	}
 	if len(s.hosts) > 1 {
