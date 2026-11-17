@@ -40,7 +40,7 @@ func TestValidate(t *testing.T) {
 	}
 	typed := "services:\n  app:\n    image: 123\n"
 	p = Validate(context.Background(), "demo", dir, typed, "")
-	if len(p) != 1 || strings.Contains(p[0].Message, "image manquante") {
+	if len(p) != 1 || p[0].Message != "service app : l'image doit être un nom, entre guillemets s'il ressemble à un nombre" {
 		t.Errorf("non-string image reported as missing: %+v", p)
 	}
 	quoted := "services:\n  app:\n    image: \"\"\n"

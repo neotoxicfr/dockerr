@@ -102,9 +102,12 @@ func load(ctx context.Context, name, dir, composeText, envText string) (*types.P
 		}
 	} else if m := pathRe.FindStringSubmatch(msg); m != nil {
 		is.Line = lineOf(composeText, strings.Split(m[1], "."))
-		// Only an image with no value: "image: 123" is another mistake.
-		if n := noImageRe.FindStringSubmatch(msg); n != nil && isNull(composeText, "services", n[1], "image") {
-			is.Message = "service " + n[1] + " : image manquante"
+		// No value is a missing image; "image: 123" is not a text.
+		if n := noImageRe.FindStringSubmatch(msg); n != nil {
+			is.Message = "service " + n[1] + " : l'image doit être un nom, entre guillemets s'il ressemble à un nombre"
+			if isNull(composeText, "services", n[1], "image") {
+				is.Message = "service " + n[1] + " : image manquante"
+			}
 		}
 	}
 	return nil, env, []Issue{is}
