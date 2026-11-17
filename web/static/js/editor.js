@@ -304,7 +304,7 @@ function serviceCard(s, m) {
     field("Labels", "sliders", kvEditor(s.labels, locked("labels"), (kv) => edit("map", path("labels"), kv)), true),
   );
   const head = h("div", { class: "vsvc-head" },
-    h("h3", {}, icon("cube"), s.name), h("span", { class: "grow" }),
+    h("h2", {}, icon("cube"), s.name), h("span", { class: "grow" }),
     editable ? h("button", { type: "button", class: "btn ghost sm icon", title: "Supprimer le service", "aria-label": `Supprimer ${s.name}`,
       onclick: async () => {
         if (await confirmAsk(`Supprimer le service ${s.name} ?`, "Il disparaît du fichier ; ses conteneurs restent jusqu'au prochain « Appliquer ».", "Supprimer")) edit("remove", ["services", s.name]);
@@ -386,6 +386,7 @@ function newServiceCard() {
 }
 
 function field(label, ico, control, wide = false) {
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(control.tagName) && !control.getAttribute("aria-label")) control.setAttribute("aria-label", label);
   return h("div", { class: "vf" + (wide ? " wide" : "") }, h("span", { class: "lbl" }, icon(ico), label), control);
 }
 const ro = (v) => h("div", { class: "ro", title: "À modifier en mode texte" }, icon("lock"), " ", v || "—");
@@ -521,7 +522,7 @@ function envPanel() {
     check();
   });
   return h("section", { class: "card vsvc" },
-    h("div", { class: "vsvc-head" }, h("h3", {}, icon("env"), ".env"), h("span", { class: "grow" }),
+    h("div", { class: "vsvc-head" }, h("h2", {}, icon("env"), ".env"), h("span", { class: "grow" }),
       h("span", { class: "faint small" }, "Lu par compose : ${NOM} dans le fichier")),
     h("div", { class: "vgrid" }, h("div", { class: "vf wide" }, editor)));
 }
@@ -602,7 +603,7 @@ function newSecretCard() {
     saveSecret(n, value.value, $$("input:checked", svc).map((x) => x.dataset.name), false, u);
   };
   return h("section", { class: "card vsvc" },
-    h("div", { class: "vsvc-head" }, h("h3", {}, icon("plus"), "Nouveau secret")),
+    h("div", { class: "vsvc-head" }, h("h2", {}, icon("plus"), "Nouveau secret")),
     h("div", { class: "vgrid" },
       field("Nom", "key", name), field("Valeur", "lock", value),
       field("UID du conteneur, s'il ne tourne pas en root", "user", uid),

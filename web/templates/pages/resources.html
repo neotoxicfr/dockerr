@@ -13,7 +13,7 @@
 {{if eq $d.Tab "containers"}}
 <div class="section-bar"><span class="grow"></span><button class="btn" data-prune="containers" data-confirm="Supprimer les conteneurs arrêtés ?">Supprimer les arrêtés</button></div>
 <div class="table-wrap"><table data-filterable>
-  <thead><tr><th class="pick"></th><th>Nom</th><th>État</th><th>Image</th><th>Pile</th><th class="num">CPU</th><th class="num">Mémoire</th></tr></thead>
+  <thead><tr><th class="pick"><span class="sr">Sélection</span></th><th>Nom</th><th>État</th><th>Image</th><th>Pile</th><th class="num">CPU</th><th class="num">Mémoire</th></tr></thead>
   <tbody>{{range $d.Containers}}
   <tr data-text="{{.Name}} {{.Image}} {{.Project}}">
     <td class="pick">{{if not (isSelf .)}}<input type="checkbox" data-sel="{{short .ID}}" data-label="{{.Name}}" aria-label="Sélectionner {{.Name}}">{{end}}</td>
@@ -42,7 +42,7 @@
 {{if not $caps.Images}}<div class="error-box">Le proxy Docker refuse l'accès aux images (IMAGES=1).</div>{{else}}
 <div class="section-bar"><span class="grow"></span><button class="btn" data-prune="images" data-confirm="Supprimer toutes les images qu'aucun conteneur n'utilise ?">Supprimer les inutilisées</button></div>
 <div class="table-wrap"><table data-filterable>
-  <thead><tr><th>Image</th><th>ID</th><th class="num">Taille</th><th class="num">Créée</th><th>Utilisée</th><th></th></tr></thead>
+  <thead><tr><th>Image</th><th>ID</th><th class="num">Taille</th><th class="num">Créée</th><th>Utilisée</th><th><span class="sr">Actions</span></th></tr></thead>
   <tbody>{{range $d.Images}}
   <tr data-text="{{join .Tags " "}} {{.ID}}">
     <td class="mono">{{if .Tags}}{{join .Tags ", "}}{{else}}<span class="faint">sans tag</span>{{end}}</td>
@@ -60,7 +60,7 @@
 <div class="fitbox">
 <div class="section-bar"><span class="grow"></span><button class="btn" data-net-new><svg class="i s"><use href="#i-plus"/></svg>Nouveau réseau</button><button class="btn" data-prune="networks" data-confirm="Supprimer les réseaux qu'aucun conteneur n'utilise ?">Supprimer les inutilisés</button></div>
 <div class="table-wrap"><table class="nettable" data-filterable>
-  <thead><tr><th class="tg"></th><th>Réseau</th><th>Pilote</th><th>Sous-réseau</th><th>Passerelle</th><th class="num">Conteneurs</th><th>Pile</th></tr></thead>
+  <thead><tr><th class="tg"><span class="sr">Détails</span></th><th>Réseau</th><th>Pilote</th><th>Sous-réseau</th><th>Passerelle</th><th class="num">Conteneurs</th><th>Pile</th></tr></thead>
   {{range $i, $n := $d.Networks}}
   <tbody class="netrow" data-text="{{.Name}} {{.Project}} {{range .Subnets}}{{.K}} {{end}}{{range .Members}}{{.Name}} {{.IPv4}} {{end}}">
   <tr class="sum" data-toggle="nd{{$i}}">
@@ -75,7 +75,7 @@
   <tr class="det" id="nd{{$i}}" hidden><td colspan="7">
     <div class="netdet">
       {{if .Members}}<table class="inner">
-        <thead><tr><th>Conteneur</th><th>IPv4</th><th>IPv6</th><th>MAC</th><th></th></tr></thead>
+        <thead><tr><th>Conteneur</th><th>IPv4</th><th>IPv6</th><th>MAC</th><th><span class="sr">Actions</span></th></tr></thead>
         <tbody>{{range .Members}}<tr>
           <td>{{if .C}}<a class="cell-name" href="/c/{{short .C.ID}}"><span class="dot {{ctrClass .C}}"></span>{{.Name}}</a>{{else}}{{.Name}}{{end}}</td>
           <td class="mono">{{if .IPv4}}{{.IPv4}}{{else}}<span class="faint">—</span>{{end}}</td>
@@ -149,7 +149,7 @@
 <div class="fitbox">
 <div class="section-bar"><span class="grow"></span><button class="btn" data-prune="volumes" data-confirm="Supprimer les volumes anonymes inutilisés ? Les volumes nommés sont gardés.">Supprimer les anonymes inutilisés</button></div>
 <div class="table-wrap"><table data-filterable>
-  <thead><tr><th>Volume</th><th>Pile</th><th>Utilisé par</th><th class="num">Créé</th>{{if and $caps.Containers $caps.Write}}<th aria-label="Actions"></th>{{end}}</tr></thead>
+  <thead><tr><th>Volume</th><th>Pile</th><th>Utilisé par</th><th class="num">Créé</th>{{if and $caps.Containers $caps.Write}}<th><span class="sr">Actions</span></th>{{end}}</tr></thead>
   <tbody>{{range $d.Volumes}}
   <tr data-text="{{.Name}} {{.Project}}">
     <td class="mono" title="{{.Name}}">{{volName .Name}}</td>
