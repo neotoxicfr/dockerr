@@ -45,6 +45,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
 
     steps:
       - name: Checkout repository
@@ -95,18 +97,38 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # The image as published, Go binary included: a known vulnerability
-      # stops here, before the release is created.
+
+  # The image as published, by digest, Go binary included: a known
+  # vulnerability stops here, before the release is created. A job of its
+  # own, read-only, with no registry login and no docker.sock handed to a
+  # container: osv-scanner is a pinned Go binary reading an exported archive.
+  scan:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+
       - name: OSV image scan
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.digest }}
         run: |
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            ghcr.io/google/osv-scanner:v2.7.1 \
-            scan image "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
+          go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.1
+          docker pull "$IMAGE"
+          docker save "$IMAGE" -o "$RUNNER_TEMP/image.tar"
+          osv-scanner scan image --archive "$RUNNER_TEMP/image.tar"
 
   # The release appears once its image can be pulled. Notes are written by
   # hand and added to it afterwards.
   release:
-    needs: build
+    needs: [build, scan]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     timeout-minutes: 10
