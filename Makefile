@@ -1,4 +1,4 @@
-.PHONY: dev build test test-race vet lint vuln check vendor docker
+.PHONY: dev build test test-race vet staticcheck lint vuln osv check vendor docker
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/neotoxicfr/dockerr/internal/server.Version=$(VERSION)
@@ -19,14 +19,22 @@ test-race:
 vet:
 	go vet ./...
 
+# Pinned versions, as in CI: never @latest.
+staticcheck:
+	go run honnef.co/go/tools/cmd/staticcheck@2026.2.2 ./...
+
 lint:
 	golangci-lint run
 
 vuln:
 	govulncheck ./...
 
+# Known vulnerabilities in go.sum and tools/vendor/package-lock.json.
+osv:
+	go run github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.1 scan source -r .
+
 # What CI runs, before pushing.
-check: build test-race lint vuln
+check: build test-race vet staticcheck lint vuln osv
 
 # Rebuild the CodeMirror and xterm bundles in web/static/vendor.
 vendor:
